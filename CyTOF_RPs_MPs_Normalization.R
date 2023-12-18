@@ -1,5 +1,4 @@
 ##################### Normalization of RPs/MPs Data #####################
-path_to_data <- "Cyanus_RPsMPs/"
 
 ######## ----------------- Install packages ----------------- ########
 
@@ -8,24 +7,23 @@ for(package in required_packages){
   if(!require(package,character.only = TRUE, quietly = TRUE)) install.packages(package, dependencies = TRUE, quietly = TRUE)
   library(package, character.only = TRUE, quietly = TRUE)
 }
-BiocManager::install("CATALYST")
+BiocManager::install("CATALYST", force = TRUE)
 library(CATALYST)
 
-#BiocManager::install("flowCore")
-#library(flowCore)
+BiocManager::install("flowCore", force = TRUE)
+library(flowCore)
 
 ######## ----------------- Read files ----------------- ########
+path_to_data <- "data/"
 
-#panel <- fread(paste0(path_to_data, "panel.csv"))
-#md <- fread(paste0(path_to_data, "metafile RP MP all.csv"))
-#sce <- prepData(paste0(path_to_data, "files"), 
-#                panel, 
-#                md, 
-#                md_cols = list(file = "file_name", id = "sample_id", factors = c("activation", "patient_id", "subgroup", "subgroup2")))
+panel <- fread(file.path(path_to_data, "panel.csv"))
+md <- fread(file.path(path_to_data, "metafile RP MP all.csv"))
+sce <- prepData(file.path(path_to_data, "RPs_MPs_files"), 
+                panel, 
+                md, 
+                md_cols = list(file = "file_name", id = "sample_id", factors = c("activation", "patient_id", "subgroup", "subgroup2")))
 
-#saveRDS(sce, "/Users/lisiarend/Desktop/sce_RPs_MPs_original.rds")
-
-sce <- readRDS("/Users/lisiarend/Desktop/sce_RPs_MPs_original.rds")
+saveRDS(sce, file.path(path_to_data, "sce_original_RPs_MPs.rds"))
 
 
 ######## ----------------- Functions ----------------- ########
@@ -93,12 +91,14 @@ ggplot(medians[!marker %in% c("CD40", "CD154", "CD3", "CD107a"),], aes(x = reord
 
 ######## ----------------- Normalize MP Expression Values (based on CD42b) ----------------- ########
 
-sce <- normalize_patient_wise_sce(sce, ain = "exprs", aout = "norm_exprs")
+sce <- normalize_patient_wise_sce(sce, ain = "exprs", aout = "exprs")
 
-medians_norm_new <- get_patient_FCs(sce, ain = "norm_exprs")
+medians_norm_new <- get_patient_FCs(sce, ain = "exprs")
 medians_norm_new[marker == "CD42b",]
 
-assays(sce)$norm_exprs[1:10,1:10]
+saveRDS(sce, file.path(path_to_data, "sce_CD42b_RPs_MPs.rds"))
+
+#assays(sce)$exprs[1:10,1:10]
 
 # try normalizing on counts + arcsinh
 
@@ -113,18 +113,18 @@ assays(sce)$norm_exprs[1:10,1:10]
 
 ######## ----------------- Check normalization values ----------------- ########
 
-sce_norm_old <- readRDS(file.path(path_to_data, "sce_norm_CD42b_old.rds"))
-old_exprs <- assays(sce_norm_old)$exprs
-old_counts <- assays(sce_norm_old)$counts
+#sce_norm_old <- readRDS(file.path(path_to_data, "sce_CD42b_RPs_MPs_old.rds"))
+#old_exprs <- assays(sce_norm_old)$exprs
+#old_counts <- assays(sce_norm_old)$counts
 
-old_exprs[1:10,1:10]
+#old_exprs[1:10,1:10]
 
-old_medians <- get_patient_FCs(sce_norm_old)
-old_medians[marker == "CD42b",]
+#old_medians <- get_patient_FCs(sce_norm_old)
+#old_medians[marker == "CD42b",]
 
 
 ######## ----------------- Write FCS Files ----------------- ########
-norm_out_dir <- file.path(path_to_data, "files_normalized")
+norm_out_dir <- file.path(path_to_data, "RPs_MPs_files_normalized")
 dir.create(norm_out_dir)
 
 for(id in unique(sce$sample_id)){
