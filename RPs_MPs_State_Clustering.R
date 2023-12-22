@@ -4,13 +4,15 @@
 
 ######## ----------------- Install packages ----------------- ########
 
-required_packages <- c("data.table", "BiocManager", "ggplot2", "stringr")
-for(package in required_packages){
-  if(!require(package,character.only = TRUE, quietly = TRUE)) install.packages(package, dependencies = TRUE, quietly = TRUE)
-  library(package, character.only = TRUE, quietly = TRUE)
-}
-BiocManager::install("CATALYST")
-library(CATALYST)
+#required_packages <- c("data.table", "BiocManager", "ggplot2", "stringr")
+#for(package in required_packages){
+#  if(!require(package,character.only = TRUE, quietly = TRUE)) install.packages(package, dependencies = TRUE, quietly = TRUE)
+#  library(package, character.only = TRUE, quietly = TRUE)
+#}
+#BiocManager::install("CATALYST", force = TRUE)
+#library(CATALYST)
+
+source("functions.R")
 
 ######## ----------------- Prepare Data ----------------- ########
 
@@ -39,6 +41,12 @@ saveRDS(sce, file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))
 
 ######## ----------------- Should we really normalize MPs by RPs?  ----------------- ########
 
+sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs")
+
+saveRDS(sce, file.path(path_to_data, "sce_CD42b_RPs_MPs_rest.rds"))
+
+medians <- get_patient_FCs(sce, column = "type", ain = "exprs")
+medians[marker == "CD42b",]
 
 ######## ----------------- Add Cell Annotation  ----------------- ########
 
@@ -110,14 +118,15 @@ clusterSCE <-
     x1 <- 0.1
     x2 <- 0.9 # threshold defining the intermediate sub-interval
     PAC <- rep(NA, length(Kvec))
-    names(PAC) <- paste("K=", Kvec, sep = "")
+    names(PAC) <- Kvec
     ecdf_list <- list()
     for(i in Kvec){
       consensus_matrix <- mc[[i]]$consensusMatrix
       consensus_values <- consensus_matrix[lower.tri(consensus_matrix)]
       ecdf_data <- ecdf(consensus_values)
-      ecdf_list[[as.character(i)]] <- data.frame(ConsensusIndex = sort(consensus_values), CDF = ecdf_data(consensus_values), Cluster = i)
       PAC[i-1] <- ecdf_data(x2) - ecdf_data(x1)
+      ecdf_list[[as.character(i)]] <- data.frame(ConsensusIndex = consensus_values, CDF = ecdf_data(consensus_values), Cluster = rep(i, length(consensus_values)), PAC = rep(PAC[i-1], length(consensus_values)))
+      
     }
     # the optimal K
     optK <- Kvec[which.min(PAC)]
@@ -129,18 +138,21 @@ clusterSCE <-
     
     # Convert the 'Clusters' column to a factor for plotting
     ecdf_data_combined$Cluster <- factor(ecdf_data_combined$Cluster, levels = sort(unique(ecdf_data_combined$Cluster)))
+    ecdf_data_combined$Legend <- interaction(ecdf_data_combined$Cluster, round(ecdf_data_combined$PAC, 3), sep = " - PAC: ", lex.order = TRUE)
     
-    # Only extract fir 6 K
-    
+    qual_col_pals <- brewer.pal.info[brewer.pal.info$category == "qual",]
+    col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
     # Plot the ECDFs for each k
-    ggplot(ecdf_data_combined[ecdf_data_combined$Cluster %in% c("2", "3", "4", "5", "6"),], aes(x = ConsensusIndex, y = CDF, color = Cluster)) +
+    ggplot(ecdf_data_combined, aes(x = ConsensusIndex, y = CDF, color = Legend)) +
       geom_line() +
       labs(x = "Consensus Index Value", y = "CDF",
            title = "Consensus matrix CDFs") +
-      theme_minimal() + 
+      theme_minimal() + scale_color_manual(name = "Cluster", values = col_vector) +
       geom_vline(xintercept = x1, color = "black", linetype = "dotdash") + 
-      geom_vline(xintercept = x2, color = "black", linetype = "dotdash")
+      geom_vline(xintercept = x2, color = "black", linetype = "dotdash") 
     
+    ggplot(data.frame(Cluster = factor(names(PAC), levels = names(PAC)), PAC = PAC), aes( x = Cluster, y = PAC, group= 1)) + geom_point() + geom_path()
+
     k <- xdim * ydim
     mcs <- seq_len(maxK)[-1]
     codes <-
@@ -167,7 +179,7 @@ clusterSCE <-
   }
 
 
-sce <- clusterSCE(sce, features = "state", seed = 1234)
+sce <- clusterSCE(sce, features = "state", seed = 1234, maxK = 40)
 
 CATALYST::delta_area(sce)
 

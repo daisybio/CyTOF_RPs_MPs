@@ -1,0 +1,3 @@
+[submodule "cyanus"]
+	path = cyanus
+	url = https://github.com/biomedbigdata/cyanus.git
