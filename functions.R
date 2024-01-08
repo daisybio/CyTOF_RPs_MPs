@@ -1,4 +1,4 @@
-######## ----------------- Functions ----------------- ########
+######## ----------------- Functions for CD42b normalization ----------------- ########
 
 get_patient_FCs <- function(sce, column = "subgroup2", ain = "exprs"){
   exprsData <- assays(sce)[[ain]]
@@ -9,30 +9,6 @@ get_patient_FCs <- function(sce, column = "subgroup2", ain = "exprs"){
   colnames(medians) <- c("marker", "patient_id", "RP_median", "MP_median")
   medians[, foldchange := RP_median/MP_median]
   return(medians)
-}
-
-# transform SingleCellExperiment
-transformData <- function (sce,
-                           cf = 5,
-                           ain = "counts",
-                           aout = "exprs") {
-  y <- assay(sce, ain)
-  chs <- CATALYST::channels(sce)
-  stopifnot(is.numeric(cf), cf > 0)
-  if (length(cf) == 1) {
-    int_metadata(sce)$cofactor <- cf
-    cf <- rep(cf, nrow(sce))
-  }
-  else {
-    stopifnot(!is.null(names(cf)), chs %in% names(cf))
-    cf <- cf[match(chs, names(cf))]
-    int_metadata(sce)$cofactor <- cf
-  }
-  fun <- asinh
-  op <- "/"
-  y <- fun(sweep(y, 1, cf, op))
-  assay(sce, aout, FALSE) <- y
-  sce
 }
 
 normalize_patient_wise_sce <- function(sce, marker = "CD42b", column = "subgroup2", ain = "exprs", aout = "norm_exprs"){
@@ -51,4 +27,27 @@ normalize_patient_wise_sce <- function(sce, marker = "CD42b", column = "subgroup
   }
   assay(sce, aout, TRUE) <- norm_exprs
   return(sce)
+}
+
+
+######## ----------------- DE Results Table ----------------- ########
+
+print_DE_top_table <- function(sce, de_res, method){
+  out <- de_res[[method]]
+  topTableOut <- data.frame(out)
+  eff_r <- de_res$effect_size
+  if(!is.null(eff_r)){
+    eff_r[, marker_id := sapply(strsplit(eff_r$group2,'::'), "[", 1)]
+    topTableOut <- merge(topTableOut, eff_r[, c("cluster_id", "marker_id", "overall_group","effsize", "magnitude")], by = c("cluster_id", "marker_id"), all.x=TRUE, all.y=FALSE, allow.cartesian=TRUE)
+    colnames(topTableOut) <- c(colnames(data.frame(out)), "overall_group","cohens_d", "magnitude")
+    topTableOut$cohens_d <- formatC(topTableOut$cohens_d)
+  }
+  
+  topTableOut$p_val <- formatC(topTableOut$p_val)
+  topTableOut$p_adj <- formatC(topTableOut$p_adj)
+  
+  DT::datatable(topTableOut, rownames = FALSE, 
+                options = list(pageLength = 10, searching = FALSE, 
+                               columnDefs = list(list( targets = c(1,2), 
+                                                       render = JS("function(data, type, row, meta) {","return data === null ? 'NA' : data;","}")))))
 }

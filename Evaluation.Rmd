@@ -1,0 +1,372 @@
+---
+title: "Evaluation of RPs MPs Data Set"
+author: Arend Lis, Bernett Judith, Manz Quirin
+date: "2023-01-08"
+output: 
+  html_document:
+    number_sections: false
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    fig_width: 12
+    fig_height: 10
+
+---
+
+```{r, setup, include = FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+sapply(list.files("functions/", full.names = TRUE), source)
+source("functions.R")
+library(DT)
+```
+
+# Original Data (not normalized on CD42b)
+
+## Read Data
+
+```{r}
+sce <- readRDS("data/sce_original_RPs_MPs.rds")
+
+sceEI <- CATALYST::ei(sce)
+
+# subset SCE
+sce_b <- sce[,sce$activation == "baseline"]
+sceEI_b <- sceEI[sceEI$activation == "baseline",]
+metadata(sce_b)$experiment_info <- sceEI_b
+
+sce_a <- sce[,sce$activation == "stimulated"]
+sceEI_a <- sceEI[sceEI$activation == "stimulated",]
+metadata(sce_a)$experiment_info <- sceEI_a
+
+de_res_b <- readRDS("data/de_results_baseline_original.rds")
+de_res_a <- readRDS("data/de_results_stimulated_original.rds")
+```
+
+## Marker Distributions
+
+### State Markers
+
+```{r}
+features <- "state"
+
+plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen",
+               shape_by = "activation")
+
+
+CATALYST::plotExprs(sce,
+                    color_by = "subgroup2",
+                    features = features,
+                    assay = "exprs")
+```
+
+### Type Markers
+
+```{r}
+features <- "type"
+
+plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen",
+               shape_by = "activation")
+
+
+CATALYST::plotExprs(sce,
+                    color_by = "subgroup2",
+                    features = features,
+                    assay = "exprs")
+```
+
+## DE Results
+
+### Paired t-test
+
+#### Baseline RPs vs. MPs
+
+```{r}
+# sce subset 
+# nach subgroup kopieren?
+plotDiffHeatmapCustom(x = sce_b,
+                      y = de_res_b$t_test,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      top_n = 20,
+                      fdr = 0.05,
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_b$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_b, de_res_b, method = "t_test")
+
+```
+
+
+#### Stimulated RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_a,
+                      y = de_res_a$t_test,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      top_n = 20,
+                      fdr = 0.05,
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_a$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_a, de_res_a, method = "t_test")
+```
+
+### CyEMD
+
+#### Baseline RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_b,
+                      y = de_res_b$CyEMD,
+                      top_n = 20,
+                      fdr = 0.05,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_b$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_b, de_res_b, method = "CyEMD")
+```
+
+
+#### Stimulated RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_a,
+                      y = de_res_a$CyEMD,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      top_n = 20,
+                      fdr = 0.05,
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_a$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_a, de_res_a, method = "CyEMD")
+
+```
+
+## DE Comparison
+
+### Baseline RPs vs. MPs
+
+```{r, fig.height = 6}
+createVennHeatmap(de_res_b)
+```
+
+### Activated RPs vs. MPs
+
+```{r, fig.height = 6}
+createVennHeatmap(de_res_a)
+```
+
+
+# Normalized Data (on CD42b)
+
+## Read Data
+
+```{r}
+sce <- readRDS("data/sce_CD42b_RPs_MPs.rds")
+
+# subset SCE
+sce_b <- sce[,sce$activation == "baseline"]
+sceEI_b <- sceEI[sceEI$activation == "baseline",]
+metadata(sce_b)$experiment_info <- sceEI_b
+
+sce_a <- sce[,sce$activation == "stimulated"]
+sceEI_a <- sceEI[sceEI$activation == "stimulated",]
+metadata(sce_a)$experiment_info <- sceEI_a
+
+de_res_b <- readRDS("data/de_results_baseline_CD42b.rds")
+de_res_a <- readRDS("data/de_results_stimulated_CD42b.rds")
+```
+
+## Marker Distributions
+
+### State Markers
+
+```{r}
+features <- "state"
+
+plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen",
+               shape_by = "activation")
+
+
+CATALYST::plotExprs(sce,
+                    color_by = "subgroup2",
+                    features = features,
+                    assay = "exprs")
+```
+
+### Type Markers
+
+```{r}
+features <- "type"
+
+plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen",
+               shape_by = "activation")
+
+
+CATALYST::plotExprs(sce,
+                    color_by = "subgroup2",
+                    features = features,
+                    assay = "exprs")
+```
+
+## DE Results
+
+### Paired t-test
+
+#### Baseline RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_b,
+                      y = de_res_b$t_test,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      top_n = 20,
+                      fdr = 0.05,
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_b$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_b, de_res_b, method = "t_test")
+
+```
+
+
+#### Stimulated RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_a,
+                      y = de_res_a$t_test,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      top_n = 20,
+                      fdr = 0.05,
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_a$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_a, de_res_a, method = "t_test")
+```
+
+### CyEMD
+
+#### Baseline RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_b,
+                      y = de_res_b$CyEMD,
+                      top_n = 20,
+                      fdr = 0.05,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_b$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_b, de_res_b, method = "CyEMD")
+```
+
+
+#### Stimulated RPs vs. MPs
+
+```{r}
+plotDiffHeatmapCustom(x = sce_a,
+                      y = de_res_a$CyEMD,
+                      col_anno = c("subgroup", "patient_id"),
+                      k = "all",
+                      top_n = 20,
+                      fdr = 0.05,
+                      lfc = 1,
+                      all = TRUE,
+                      eff_r = de_res_a$effect_size,
+                      sort_by = "padj",
+                      assay = "exprs",
+                      fun = "median",
+                      normalize = TRUE
+                      )
+
+print_DE_top_table(sce_a, de_res_a, method = "CyEMD")
+
+```
+
+## DE Comparison
+
+### Baseline RPs vs. MPs
+
+```{r, fig.height = 6}
+createVennHeatmap(de_res_b)
+```
+
+### Activated RPs vs. MPs
+
+```{r, fig.height = 6}
+createVennHeatmap(de_res_a)
+```
+
+
