@@ -1,3 +1,20 @@
+######## ----------------- Subset SummarizedExperiment ----------------- ########
+
+subset_sce <- function(sce, coldata_column, coldata_value){
+  sceEI <- sceEI <- CATALYST::ei(sce)
+  # subset sce
+  subset_sce <- sce[,sce[[coldata_column]] == coldata_value]
+  # droplevels coldata
+  coldata <- as.data.frame(SummarizedExperiment::colData(subset_sce))
+  coldata <- sapply(coldata, droplevels)
+  SummarizedExperiment::colData(subset_sce) <- S4Vectors::DataFrame(as.data.frame(coldata))
+  # subset experimental info
+  sceEI_subset <- sceEI[sceEI$activation == "baseline",]
+  metadata(subset_sce)$experiment_info <- sceEI_subset
+  return(subset_sce)
+}
+
+
 ######## ----------------- Functions for CD42b normalization ----------------- ########
 
 get_patient_FCs <- function(sce, column = "subgroup2", ain = "exprs"){
