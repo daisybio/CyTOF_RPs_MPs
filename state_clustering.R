@@ -1,20 +1,17 @@
 
 ##################### Clustering state markers of RPs/MPs/Rest Data #####################
 
-normalize <- TRUE
-
-######## ----------------- Source functions and install packages ----------------- ########
-
+######## ----------------- Source functions ----------------- ########
+library(data.table)
+library(CATALYST)
+library(stringr)
+library(RColorBrewer)
 source("functions.R")
 
-library(data.table)
-library(SummarizedExperiment)
-library(RColorBrewer)
-library(ggplot2)
+normalize <- TRUE
 
 ######## ----------------- Prepare Data ----------------- ########
 path_to_data <- "data/"
-
 
 if(file.exists(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))){
   sce <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))
@@ -40,11 +37,22 @@ if(file.exists(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))){
 }
 
 ######## ----------------- Should we really normalize MPs by RPs?  ----------------- ########
+if(normalize){
+  sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs")
+
 
 if(normalize){
   sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs")
 }
+  saveRDS(sce, file.path(path_to_data, "sce_CD42b_RPs_MPs_rest.rds"))
+}
 
+#medians <- get_patient_FCs(sce, column = "type", ain = "exprs")
+#medians[marker == "CD42b",]
+
+######## ----------------- Add Cell Annotation  ----------------- ########
+
+annotation <- colData(sce)$type
 
 ######## ----------------- Perform Clustering  ----------------- ########
 
