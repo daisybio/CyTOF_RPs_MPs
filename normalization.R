@@ -1,5 +1,6 @@
 ##################### Normalization of RPs/MPs Data #####################
-
+library(data.table)
+library(flowCore)
 path_to_data <- "data"
 
 ######## ----------------- Source Functions ----------------- ########
@@ -63,3 +64,4 @@ sce <- prepData(file.path(path_to_data, "RPs_MPs_files_normalized"),
 
 medians <- get_patient_FCs(sce, ain = "exprs")
 medians[marker == "CD42b",]
+
