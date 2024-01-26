@@ -9,14 +9,25 @@ library(RColorBrewer)
 source("functions.R")
 
 normalize <- TRUE
+normalization_marker <- 'CD41'
+add_DNA <- TRUE
 
 ######## ----------------- Prepare Data ----------------- ########
-path_to_data <- "data/"
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
 
-if(file.exists(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))){
-  sce <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))
+if(add_DNA){
+  outfile <- paste0("sce_", normalization_marker, "_RPs_MPs_rest.rds")
+}else{
+  outfile <- paste0("sce_", normalization_marker, "_RPs_MPs_rest_DNA.rds")
+}
+
+if(file.exists(file.path(path_to_data, outfile))){
+  sce <- readRDS(file.path(path_to_data, outfile))
 } else {
   panel <- fread(file.path(path_to_data, "panel.csv"))
+  if(add_DNA){
+    panel <- rbind(panel, data.table(fcs_colname = c("Ir191Di", "Ir193Di"), antigen = c('DNA1', 'DNA2'), marker_class = c('none', 'none')))
+  }
   #built meta data file
   files <- list.files(file.path(path_to_data, "CCS_baseline"))
   md <- data.table(file_name = files)
@@ -33,22 +44,14 @@ if(file.exists(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))){
                   cofactor = 5,
                   md_cols = list(file = "file_name", id = "sample_id", factors = c("type", "patient_id")))
   
-  saveRDS(sce, file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))
+  #saveRDS(sce, file.path(path_to_data, outfile))
 }
 
 ######## ----------------- Should we really normalize MPs by RPs?  ----------------- ########
 if(normalize){
-  sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs")
-
-
-if(normalize){
-  sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs")
+  sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs", marker = normalization_marker)
+  saveRDS(sce, file.path(path_to_data, paste0("sce_", normalization_marker, "_RPs_MPs_rest", ifelse(add_DNA, "_DNA", ""), ".rds")))
 }
-  saveRDS(sce, file.path(path_to_data, "sce_CD42b_RPs_MPs_rest.rds"))
-}
-
-#medians <- get_patient_FCs(sce, column = "type", ain = "exprs")
-#medians[marker == "CD42b",]
 
 ######## ----------------- Add Cell Annotation  ----------------- ########
 

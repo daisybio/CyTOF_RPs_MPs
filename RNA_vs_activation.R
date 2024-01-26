@@ -1,3 +1,6 @@
+##################### Visualization of RNA content vs markers #####################
+
+######## ----------------- Source functions ----------------- ########
 suppressMessages({
   library(data.table)
   library(ggplot2)
@@ -13,9 +16,9 @@ suppressMessages({
 })
 
 theme_set(theme_bw(base_size = 16))
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
 
-sce <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_original_RPs_MPs_rest_DNA.rds")
-sce_norm <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_CD42b_RPs_MPs_rest_DNA.rds")
+######## ----------------- Visualization functions ----------------- ########
 
 paired_boxes <- function(sce) {
   df <- as.data.table(t(assays(sce)$exprs))
@@ -34,12 +37,6 @@ paired_boxes <- function(sce) {
     #stat_compare_means(paired = TRUE, method = "t.test")+
     facet_wrap(~marker, scales = 'free')
 }
-
-paired_boxes(sce)
-ggsave('plots/paired_boxes.png', height=8, width=12)
-paired_boxes(sce_norm)
-ggsave('plots/paired_boxes_norm.png', height=8, width=12)
-
 
 dna_boxes <- function(sce) {
   df <- as.data.table(t(assays(sce)$exprs))
@@ -65,7 +62,16 @@ dna_boxes <- function(sce) {
     geom_boxplot()
 }
 
-dna_boxes(sce)
-ggsave('plots/dna_boxes.png', height = 5, width=17)
-dna_boxes(sce_norm)
-ggsave('plots/dna_boxes_norm.png', height = 5, width=17)
+
+######## ----------------- Visualization ----------------- ########
+
+mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds")
+names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41')
+
+for(obj in names(mapping)[4]){
+  sce <- readRDS(file.path(path_to_data, mapping[obj]))
+  paired_boxes(sce)
+  ggsave(paste0('plots/paired_boxes_', obj, '.png'), height=8, width=12)
+  dna_boxes(sce)
+  ggsave(paste0('plots/dna_boxes_', obj, '.png'), height=5, width=17)
+}
