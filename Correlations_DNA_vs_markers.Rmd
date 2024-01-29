@@ -1,6 +1,15 @@
-##################### Visualization of RNA content vs markers #####################
+---
+title: "Correlations DNA vs. markers"
+output:
+  html_document:
+    df_print: paged
+---
 
-######## ----------------- Source functions ----------------- ########
+Here, we investigate the correlations between the expression of the DNA markers and the other markers. 
+
+## Source functions and libraries
+
+```{r}
 suppressMessages({
   library(data.table)
   library(ggplot2)
@@ -14,11 +23,6 @@ suppressMessages({
   library(patchwork)
   source("functions/prep_functions.R")
 })
-
-theme_set(theme_bw(base_size = 16))
-path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
-
-######## ----------------- Visualization functions ----------------- ########
 
 paired_boxes <- function(sce) {
   df <- as.data.table(t(assays(sce)$exprs))
@@ -61,32 +65,52 @@ dna_boxes <- function(sce) {
   ggplot(dna_df, aes(x = marker, y = correlation, fill = DNA_marker))+
     geom_boxplot()
 }
+```
+
+## Global settings
+```{r}
+theme_set(theme_bw(base_size = 16))
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
+```
 
 
-######## ----------------- Visualization ----------------- ########
+## Visualization
 
+Here, we investigate the correlations between expressions of the 2 DNA markers and the other markers for: 
+
+- the unnormalized data
+- the data normalized w.r.t. CD42b
+- the data normalized w.r.t. CD61
+- the data normalized w.r.t. CD41
+- the data normalized w.r.t. DNA2
+
+```{r, fig.width = 17, fig.height = 5}
 mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
 names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41', 'DNA2')
 
 for(obj in names(mapping)){
   sce <- readRDS(file.path(path_to_data, mapping[obj]))
-  paired_boxes(sce)
-  ggsave(paste0('plots/paired_boxes_', obj, '.png'), height=8, width=12)
-  dna_boxes(sce)
+  plot(dna_boxes(sce))
   ggsave(paste0('plots/dna_boxes_', obj, '.png'), height=5, width=17)
 }
+```
 
-df <- as.data.table(t(assays(sce)$exprs))
-df[, group := colData(sce)$type]
-df[, patient_id := colData(sce)$patient_id]
+Here, we show the pairwise median expressions for RPs vs. MPs for:
 
-df <- melt(df, id.vars = c('group', 'patient_id'), variable.name = 'marker', value.name = 'expression')
+- the unnormalized data
+- the data normalized w.r.t. CD42b
+- the data normalized w.r.t. CD61
+- the data normalized w.r.t. CD41
+- the data normalized w.r.t. DNA2
 
-df_medians <- df[!group == 'rest', median(expression), by=c("patient_id", "group", "marker")]
-colnames(df_medians) <- c('patient_id', 'group', 'marker', 'expression')
-df_medians[, patient_id := as.factor(patient_id)]
+```{r, fig.width = 12, fig.height = 8}
+mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
+names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41', 'DNA2')
 
-t_tests <- df_medians[, t.test(expression ~ group, paired = T)$p.value, by=marker]
-t_tests[, p.adj := p.adjust(V1, method = 'bonferroni')]
-t_tests[, signif := ifelse(p.adj < 0.05, 1, 0)]
-t_tests[order(p.adj, decreasing = F)]
+for(obj in names(mapping)){
+  sce <- readRDS(file.path(path_to_data, mapping[obj]))
+  plot(paired_boxes(sce))
+  ggsave(paste0('plots/paired_boxes_', obj, '.png'), height=8, width=12)
+}
+```
+

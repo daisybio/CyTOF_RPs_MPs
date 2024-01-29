@@ -9,7 +9,7 @@ library(RColorBrewer)
 source("functions.R")
 
 normalize <- TRUE
-normalization_marker <- 'CD41'
+normalization_marker <- 'DNA2'
 add_DNA <- TRUE
 
 ######## ----------------- Prepare Data ----------------- ########
