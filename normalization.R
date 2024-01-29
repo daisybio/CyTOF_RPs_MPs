@@ -1,7 +1,8 @@
 ##################### Normalization of RPs/MPs Data #####################
 library(data.table)
 library(flowCore)
-path_to_data <- "data"
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data"
+
 
 ######## ----------------- Source Functions ----------------- ########
 
