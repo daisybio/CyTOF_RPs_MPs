@@ -26,13 +26,13 @@ library(DT)
 ## Read Data
 
 ```{r}
-sce <- readRDS("data/sce_original_RPs_MPs.rds")
+sce <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_original_RPs_MPs.rds")
 
 sce_b <- subset_sce(sce, "activation", "baseline")
 sce_a <- subset_sce(sce, "activation", "stimulated")
 
-de_res_b <- readRDS("data/de_results_baseline_original.rds")
-de_res_a <- readRDS("data/de_results_stimulated_original.rds")
+de_res_b <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/de_results_baseline_original.rds")
+de_res_a <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/de_results_stimulated_original.rds")
 ```
 
 ## Marker Distributions
@@ -333,7 +333,7 @@ plotDiffHeatmapCustom(x = sce_a,
                       all = TRUE,
                       eff_r = de_res_a$effect_size,
                       sort_by = "padj",
-                      assay = "exprs",
+                    assay = "exprs",
                       fun = "median",
                       normalize = TRUE
                       )

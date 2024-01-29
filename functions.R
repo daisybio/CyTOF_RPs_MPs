@@ -132,43 +132,14 @@ clusterSCENew <-
     dev.off()
     # PAC
     Kvec <- 2:maxK
-    x1 <- 0.1
-    x2 <- 0.9 # threshold defining the intermediate sub-interval
-    PAC <- rep(NA, length(Kvec))
-    names(PAC) <- Kvec
-    ecdf_list <- list()
-    for(i in Kvec){
+    names(Kvec) <- Kvec
+    mc_dt <- rbindlist(lapply(Kvec, function(i){
       consensus_matrix <- mc[[i]]$consensusMatrix
       consensus_values <- consensus_matrix[lower.tri(consensus_matrix)]
       ecdf_data <- ecdf(consensus_values)
-      PAC[i-1] <- ecdf_data(x2) - ecdf_data(x1)
-      ecdf_list[[as.character(i)]] <- data.frame(ConsensusIndex = consensus_values, CDF = ecdf_data(consensus_values), Cluster = rep(i, length(consensus_values)), PAC = rep(PAC[i-1], length(consensus_values)))
-      
-    }
-    # the optimal K
-    optK <- Kvec[which.min(PAC)]
-    message(paste0("The optimal K (according to PAC): ", optK))
-    
-    # plot
-    # Combine all the data frames into one
-    ecdf_data_combined <- do.call(rbind, ecdf_list)
-    
-    # Convert the 'Clusters' column to a factor for plotting
-    ecdf_data_combined$Cluster <- factor(ecdf_data_combined$Cluster, levels = sort(unique(ecdf_data_combined$Cluster)))
-    ecdf_data_combined$Legend <- interaction(ecdf_data_combined$Cluster, round(ecdf_data_combined$PAC, 3), sep = " - PAC: ", lex.order = TRUE)
-    
-    qual_col_pals <- brewer.pal.info[brewer.pal.info$category == "qual",]
-    col_vector = unlist(mapply(brewer.pal, qual_col_pals$maxcolors, rownames(qual_col_pals)))
-    # Plot the ECDFs for each k
-    ggplot(ecdf_data_combined, aes(x = ConsensusIndex, y = CDF, color = Legend)) +
-      geom_line() +
-      labs(x = "Consensus Index Value", y = "CDF",
-           title = "Consensus matrix CDFs") +
-      theme_minimal() + scale_color_manual(name = "Cluster", values = col_vector) +
-      geom_vline(xintercept = x1, color = "black", linetype = "dotdash") + 
-      geom_vline(xintercept = x2, color = "black", linetype = "dotdash") 
-    
-    ggplot(data.frame(Cluster = factor(names(PAC), levels = names(PAC)), PAC = PAC), aes( x = Cluster, y = PAC, group= 1)) + geom_point() + geom_path()
+      list(ConsensusIndex = consensus_values, CDF = ecdf_data(consensus_values))
+    }), idcol = 'k')
+    mc_dt[, k:=factor(k, levels=Kvec)]
     
     k <- xdim * ydim
     mcs <- seq_len(maxK)[-1]
@@ -184,7 +155,8 @@ clusterSCENew <-
     S4Vectors::metadata(x)$SOM_codes <- som$map$codes
     S4Vectors::metadata(x)$SOM_medianValues <- som$map$medianValues
     S4Vectors::metadata(x)$SOM_MST <- som$MST
-    S4Vectors::metadata(x)$delta_area <- CATALYST:::.plot_delta_area(mc)
+    # S4Vectors::metadata(x)$delta_area <- CATALYST:::.plot_delta_area(mc)
+    S4Vectors::metadata(x)$mc_dt <- mc_dt
     x <-
       CATALYST::mergeClusters(
         x,
@@ -195,4 +167,70 @@ clusterSCENew <-
     return(x)
   }
 
+# plot ecdf
+plot_ecdf <- function(sce, interactive=TRUE){
+  require(ggplot2)
+  mc_dt <- metadata(sce)$mc_dt
+  stopifnot(!is.null(mc_dt))
+  ggp <- ggplot(mc_dt, aes(x = ConsensusIndex, y=CDF, color = k)) + geom_line() + theme_bw()
+  if (interactive) ggp <- plotly::ggplotly(ggp)
+  return(ggp)
+}
+
+# plot delta area
+plot_delta_area <- function(sce, interactive=TRUE){
+  mc_dt <- metadata(sce)$mc_dt
+  stopifnot(!is.null(mc_dt))
+  
+  mc_dt <- mc_dt[order(k, ConsensusIndex)]
+  # trapezoidal rule function
+  trapezoid_area <- function(x, y) {
+    if (length(x) != length(y)) {
+      stop("x and y must be of the same length")
+    }
+    sum((x[-1] - x[-length(x)]) * (y[-1] + y[-length(y)]) / 2)
+  }
+  
+  # Apply the optimized trapezoidal rule to each group
+  area_under_curve <- mc_dt[, .(AUC = trapezoid_area(ConsensusIndex, CDF)), by = .(k)]
+  # Compute delta Area
+  area_under_curve[, DeltaAUC := c(NA, diff(AUC))]
+  area_under_curve[k == '2', DeltaAUC:=AUC]
+  
+  # View the results
+  ggp <- ggplot(area_under_curve, aes(x = k, y = DeltaAUC, group=1)) + geom_point() + geom_line() + theme_bw()
+  if (interactive) ggp <- plotly::ggplotly(ggp)
+  return(ggp)
+}
+
+# plot PAC
+plot_pac <- function(sce,
+                     interactive = TRUE,
+                     x1 = .05,
+                     x2 = 1 - x1) {
+  mc_dt <- metadata(sce)$mc_dt
+  stopifnot(!is.null(mc_dt))
+  
+  pac_dt <-
+    merge(mc_dt[ConsensusIndex <= x1, .(y1 = max(CDF)), by = k], mc_dt[ConsensusIndex >= x2, .(y2 =
+                                                                                                 min(CDF)), by = k])
+  pac_dt[, PAC:=y2 - y1]
+  pac_dt[PAC == min(PAC), label:='minimum PAC']
+  # View the results
+  ggp <-
+    ggplot(pac_dt, aes(
+      x = k,
+      y = PAC,
+      group = 1
+    )) + geom_point(aes(color = label)) + geom_line() +
+    scale_color_manual(values = c('minimum PAC'='red')) + theme_bw()
+  if (interactive) {
+    ggp <- plotly::ggplotly(ggp)
+    for (i in seq_along(ggp$x$data))
+      if (length(ggp$x$data[[i]]$legendgroup)>0) 
+        if(ggp$x$data[[i]]$legendgroup =="NA") 
+          ggp$x$data[[i]]$showlegend <- FALSE
+  }
+  return(ggp)
+}
 
