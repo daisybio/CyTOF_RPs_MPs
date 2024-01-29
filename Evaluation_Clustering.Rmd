@@ -1,0 +1,115 @@
+---
+title: "Clustering Evaluation of RPs MPs Data Set"
+author: Arend Lis, Bernett Judith, Manz Quirin
+date: "2024-01-24"
+output: 
+  html_document:
+    number_sections: false
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    fig_width: 12
+    fig_height: 10
+
+---
+
+```{r}
+##################### Clustering state markers of RPs/MPs/Rest Data #####################
+
+######## ----------------- Source functions ----------------- ########
+library(data.table)
+library(CATALYST)
+library(ggplot2)
+library(stringr)
+library(RColorBrewer)
+source("functions.R")
+
+normalize <- FALSE
+```
+
+
+```{r}
+######## ----------------- Prepare Data ----------------- ########
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
+
+sce_rds <- "sce_DNA2_RPs_MPs_rest_DNA.rds"
+
+if(file.exists(file.path(path_to_data, sce_rds))){
+  sce <- readRDS(file.path(path_to_data, sce_rds))
+} else {
+  panel <- fread(file.path(path_to_data, "panel_DNA.csv"))
+  #built meta data file
+  files <- list.files(file.path(path_to_data, "CCS_baseline"))
+  md <- data.table(file_name = files)
+  md$sample_id <- sapply(strsplit(md$file_name,"[.]"), "[", 1)
+  md$sample_id <- str_replace(md$sample_id, "_platlet_specific", "")
+  md$sample_id <- str_replace(md$sample_id, "RPS_", "RPs") # inconsistent naming of files
+  md$type <- sapply(strsplit(md$sample_id,"_"), "[", 2)
+  md$patient_id <- sapply(strsplit(md$sample_id,"_"), "[", 1) 
+  
+  sce <- prepData(file.path(path_to_data, "CCS_baseline"), 
+                  panel, 
+                  md, 
+                  transform = TRUE,
+                  cofactor = 5,
+                  md_cols = list(file = "file_name", id = "sample_id", factors = c("type", "patient_id")))
+  
+  saveRDS(sce, file.path(path_to_data, sce_rds))
+}
+```
+
+
+```{r}
+######## ----------------- Should we really normalize MPs by RPs?  ----------------- ########
+normalized_sce_rds <- sub('original', 'CD42b', sce_rds, fixed = TRUE)
+
+if(normalize){
+  if(file.exists(file.path(path_to_data, normalized_sce_rds))){
+    sce <- readRDS(file.path(path_to_data, normalized_sce_rds))
+  } else {
+    sce <- normalize_patient_wise_sce(sce, column = "type", ain = "exprs", aout = "exprs")
+  
+    saveRDS(sce, file.path(path_to_data, normalized_sce_rds))
+  }
+}
+```
+
+
+```{r}
+######## ----------------- Perform Clustering  ----------------- ########
+
+these_features <- c("type", "state")
+
+clustered_sce_rds <- sub('.rds', paste0('_clusteredBy_', paste(these_features, collapse="-"), '.rds'), ifelse(normalize, normalized_sce_rds, sce_rds), fixed = TRUE)
+
+if(file.exists(file.path(path_to_data, clustered_sce_rds))){
+    sce <- readRDS(file.path(path_to_data, clustered_sce_rds))
+  } else {
+    sce <- clusterSCENew(sce, features = names(sce)[marker_classes(sce) %in% these_features], seed = 1234, xdim = 20, ydim = 20, maxK = 50)
+
+    saveRDS(sce, file.path(path_to_data, clustered_sce_rds))
+}
+```
+
+
+```{r}
+######## ----------------- Compare Clustering  ----------------- ########
+# rand_index <- rand.index(cluster_annotation, gated_annotation)
+# adj_rand_index <- adj.rand.index(cluster_annotation, gated_annotation)
+
+plot_ecdf(sce)
+plot_delta_area(sce)
+plot_pac(sce)
+```
+
+```{r, eval=FALSE}
+for (k in 2:50){
+  print(sprintf('k: %d, ARI: %.3f', k, mclust::adjustedRandIndex(cluster_ids(sce, k=sprintf('meta%d', k)), colData(sce)$type)))
+  # print(plotExprHeatmap(sce, by='cluster_id', k=sprintf('meta%d', k), features = NULL))
+}
+# plotClusterExprs(sce, k=sprintf('meta%d', k), features = NULL)
+```
+```{r}
+plotClusterExprs(sce, k='meta22', features = NULL)
+```
+
