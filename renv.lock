@@ -785,6 +785,16 @@
       "Hash": "4f57884290cc75ab22f4af9e9d4ca862",
       "Requirements": []
     },
+    "askpass": {
+      "Package": "askpass",
+      "Version": "1.2.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "cad6cf7f1d5f6e906700b9d3e718c796",
+      "Requirements": [
+        "sys"
+      ]
+    },
     "backports": {
       "Package": "backports",
       "Version": "1.4.1",
@@ -1124,6 +1134,14 @@
         "jsonlite",
         "lazyeval"
       ]
+    },
+    "curl": {
+      "Package": "curl",
+      "Version": "5.2.0",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "ce88d13c0b10fe88a37d9c59dba2d7f9",
+      "Requirements": []
     },
     "cytolib": {
       "Package": "cytolib",
@@ -1680,10 +1698,10 @@
     },
     "ggrepel": {
       "Package": "ggrepel",
-      "Version": "0.9.4",
+      "Version": "0.9.5",
       "Source": "Repository",
       "Repository": "CRAN",
-      "Hash": "e9839af82cc43fda486a638b68b439b2",
+      "Hash": "cc3361e234c4a5050e29697d675764aa",
       "Requirements": [
         "Rcpp",
         "ggplot2",
@@ -1881,6 +1899,20 @@
         "Rcpp",
         "later",
         "promises"
+      ]
+    },
+    "httr": {
+      "Package": "httr",
+      "Version": "1.4.7",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "ac107251d9d9fd72f0ca8049988f1d7f",
+      "Requirements": [
+        "R6",
+        "curl",
+        "jsonlite",
+        "mime",
+        "openssl"
       ]
     },
     "igraph": {
@@ -2287,6 +2319,16 @@
       "Hash": "df58958f293b166e4ab885ebcad90e02",
       "Requirements": []
     },
+    "openssl": {
+      "Package": "openssl",
+      "Version": "2.1.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "2a0dc8c6adfb6f032e4d4af82d258ab5",
+      "Requirements": [
+        "askpass"
+      ]
+    },
     "pROC": {
       "Package": "pROC",
       "Version": "1.18.5",
@@ -2387,6 +2429,36 @@
         "rlang",
         "rprojroot",
         "withr"
+      ]
+    },
+    "plotly": {
+      "Package": "plotly",
+      "Version": "4.10.4",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "a1ac5c03ad5ad12b9d1597e00e23c3dd",
+      "Requirements": [
+        "RColorBrewer",
+        "base64enc",
+        "crosstalk",
+        "data.table",
+        "digest",
+        "dplyr",
+        "ggplot2",
+        "htmltools",
+        "htmlwidgets",
+        "httr",
+        "jsonlite",
+        "lazyeval",
+        "magrittr",
+        "promises",
+        "purrr",
+        "rlang",
+        "scales",
+        "tibble",
+        "tidyr",
+        "vctrs",
+        "viridisLite"
       ]
     },
     "plotrix": {
@@ -2903,6 +2975,14 @@
       "Requirements": [
         "Matrix"
       ]
+    },
+    "sys": {
+      "Package": "sys",
+      "Version": "3.4.2",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "3a1be13d68d47a8cd0bfd74739ca1555",
+      "Requirements": []
     },
     "systemfonts": {
       "Package": "systemfonts",
