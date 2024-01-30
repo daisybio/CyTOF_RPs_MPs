@@ -6,17 +6,11 @@
 # first argument -> path of the sce object
 # second argument -> if it is the "original" sce object or the "CD42b" object
 
-setwd("../..")
+#source("renv/activate.R")
 
 ######## ----------------- Source Functions ----------------- ########
 
 sapply(list.files("functions/", full.names = TRUE), source)
-
-library(CATALYST)
-library(SingleCellExperiment)
-library(data.table)
-# TODO: load CyEMD package and remove CyEMD.R script from functions
-# TODO: link github repo with functions to this repository
 
 
 ######## ----------------- Save Arguments ----------------- ########
