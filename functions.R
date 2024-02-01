@@ -172,7 +172,7 @@ plot_ecdf <- function(sce, interactive=TRUE){
   require(ggplot2)
   mc_dt <- metadata(sce)$mc_dt
   stopifnot(!is.null(mc_dt))
-  ggp <- ggplot(mc_dt, aes(x = ConsensusIndex, y=CDF, color = k)) + geom_line() + theme_bw()
+  ggp <- ggplot(mc_dt, aes(x = ConsensusIndex, y=CDF, color = k)) + geom_step() + theme_bw()
   if (interactive) ggp <- plotly::ggplotly(ggp)
   return(ggp)
 }
@@ -183,16 +183,15 @@ plot_delta_area <- function(sce, interactive=TRUE){
   stopifnot(!is.null(mc_dt))
   
   mc_dt <- mc_dt[order(k, ConsensusIndex)]
-  # trapezoidal rule function
-  trapezoid_area <- function(x, y) {
-    if (length(x) != length(y)) {
-      stop("x and y must be of the same length")
-    }
-    sum((x[-1] - x[-length(x)]) * (y[-1] + y[-length(y)]) / 2)
-  }
   
-  # Apply the optimized trapezoidal rule to each group
-  area_under_curve <- mc_dt[, .(AUC = trapezoid_area(ConsensusIndex, CDF)), by = .(k)]
+  area_under_curve <- mc_dt[, .(AUC = {
+    # Calculate the widths (differences in ConsensusIndex) and heights (CDF values)
+    widths <- diff(.SD$ConsensusIndex)
+    heights <- head(.SD$CDF, -1)
+    # Calculate the area of each rectangle and sum them up
+    sum(widths * heights)
+  }), by = k]
+  
   # Compute delta Area
   area_under_curve[, DeltaAUC := c(NA, diff(AUC))]
   area_under_curve[k == '2', DeltaAUC:=AUC]
@@ -212,8 +211,8 @@ plot_pac <- function(sce,
   stopifnot(!is.null(mc_dt))
   
   pac_dt <-
-    merge(mc_dt[ConsensusIndex <= x1, .(y1 = max(CDF)), by = k], mc_dt[ConsensusIndex >= x2, .(y2 =
-                                                                                                 min(CDF)), by = k])
+    merge(mc_dt[ConsensusIndex <= x1, .(y1 = max(CDF)), by = k], mc_dt[ConsensusIndex <= x2, .(y2 =
+                                                                                                 max(CDF)), by = k])
   pac_dt[, PAC:=y2 - y1]
   pac_dt[PAC == min(PAC), label:='minimum PAC']
   # View the results
