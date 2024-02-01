@@ -92,6 +92,7 @@ if(file.exists(file.path(path_to_data, clustered_sce_rds))){
 # Load the clustered objects
 ```{r}
 sce_original <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs_rest_DNA_clusteredBy_type-state.rds"))
+sce_CD42b_normalized <- readRDS(file.path(path_to_data, "sce_CD42b_RPs_MPs_rest_DNA_clusteredBy_type-state.rds"))
 sce_DNA_normalized <- readRDS(file.path(path_to_data, "sce_DNA2_RPs_MPs_rest_DNA_clusteredBy_type-state.rds"))
 ```
 
@@ -103,6 +104,7 @@ The CDF curve should be as flat in the middle as possible, indicating a low prop
 ```{r}
 ######## ----------------- Investigate Clustering  ----------------- ########
 plot_ecdf(sce_original, interactive = FALSE)
+plot_ecdf(sce_CD42b_normalized, interactive = FALSE)
 plot_ecdf(sce_DNA_normalized, interactive = FALSE)
 ```
 
@@ -110,6 +112,7 @@ plot_ecdf(sce_DNA_normalized, interactive = FALSE)
 The delta area under the curve plot just shows the differences between area under the curve for k, compared to k - 1. One could pick the last point before plateau onset.
 ```{r}
 plot_delta_area(sce_original)
+plot_delta_area(sce_CD42b_normalized)
 plot_delta_area(sce_DNA_normalized)
 ```
 
@@ -117,6 +120,7 @@ plot_delta_area(sce_DNA_normalized)
 The delta area plot only compares the area under the CDF curve, and does not actually check, where the changes in the curve are happening (changes should help flatten the curve in the middle of the x axis). To overcome this, we can directly compute the proportion of ambiguous clusters (PAC), which is defined by the number of clusters which have a consensus index between, e.g., 0.1 and 0.9. A low value indicates more stable clusters. One has to keep in mind that a large number of clusters usually creates a lower PAC.
 ```{r}
 plot_pac(sce_original, x1 = .1)
+plot_pac(sce_CD42b_normalized, x1 = .1)
 plot_pac(sce_DNA_normalized, x1 = .1)
 ```
 # ARI
@@ -126,7 +130,11 @@ In the case below, we computed the ARI for each metacluster in comparison with t
 
 ```{r, fig.width= 9}
 stopifnot(identical(colData(sce_original)$type, colData(sce_DNA_normalized)$type))
-ari_dt <- rbindlist(lapply(list(original = sce_original, DNA2_normalized = sce_DNA_normalized),
+stopifnot(identical(colData(sce_original)$type, colData(sce_CD42b_normalized)$type))
+
+ari_dt <- rbindlist(lapply(list(original = sce_original, 
+                                CD42b_normalized = sce_CD42b_normalized,
+                                DNA2_normalized = sce_DNA_normalized),
                  function(sce) {
                    rbindlist(sapply(names(cluster_codes(sce))[startsWith(names(cluster_codes(sce)), 'meta')], function(code)
                      list(ARI=mclust::adjustedRandIndex(cluster_ids(sce, k = code), colData(sce)$type)), simplify = FALSE),
