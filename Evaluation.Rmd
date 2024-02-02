@@ -34,22 +34,13 @@ names(RPs_MPs_colors) <- c("RP", "MP")
 ## Read Data
 
 ```{r}
-<<<<<<< HEAD
-sce <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_original_RPs_MPs.rds")
-=======
 sce <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs.rds"))
->>>>>>> origin/visualizations
 
 sce_b <- subset_sce(sce, "activation", "baseline")
 sce_a <- subset_sce(sce, "activation", "stimulated")
 
-<<<<<<< HEAD
-de_res_b <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/de_results_baseline_original.rds")
-de_res_a <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/de_results_stimulated_original.rds")
-=======
 de_res_b <- readRDS(file.path(path_to_data, "de_results_baseline_original.rds"))
 de_res_a <- readRDS(file.path(path_to_data, "de_results_stimulated_original.rds"))
->>>>>>> origin/visualizations
 ```
 
 ## Marker Distributions
