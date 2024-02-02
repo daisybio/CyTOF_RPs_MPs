@@ -672,7 +672,7 @@ plotPbExprsMod <- function (x, k = "meta20", features = "state", assay = "exprs"
   }
   else size_by <- NULL
   df <- df[ncs > 0, , drop = FALSE]
-  ggplot(df, aes_string(x_var, "value", col = color_by)) + 
+  p <- ggplot(df, aes_string(x_var, "value", col = color_by)) + 
     facet_wrap(facet_by, ncol = ncol, scales = "free_y") + 
     (if (geom != "boxes") 
       geom_point(alpha = 0.8, position = (if (jitter) {
@@ -681,7 +681,8 @@ plotPbExprsMod <- function (x, k = "meta20", features = "state", assay = "exprs"
       else "identity"), aes_string(fill = color_by, size = size_by, 
                                    shape = shape_by))) + (if (geom != "points") 
                                      geom_boxplot(alpha = 0.4, width = 0.8, fill = NA, outlier.color = NA, 
-                                                  show.legend = FALSE)) + scale_shape_manual(values = shapes) + 
+                                                  show.legend = FALSE)) 
+  p <- p + scale_shape_manual(values = shapes) + 
     scale_size_continuous(range = c(0.5, 3)) + guides(fill = FALSE, 
                                                       size = guide_legend(order = 3), shape = guide_legend(order = 2, 
                                                                                                            override.aes = list(size = 3)), col = guide_legend(order = 1, 

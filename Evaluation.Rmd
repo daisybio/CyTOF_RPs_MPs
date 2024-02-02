@@ -16,8 +16,16 @@ output:
 ```{r, setup, include = FALSE}
 knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
 sapply(list.files("functions/", full.names = TRUE), source)
+
 source("functions.R")
 library(DT)
+library(stringr)
+
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data"
+
+RPs_MPs_colors <- c("#FF1F5B", "#009ADE")
+names(RPs_MPs_colors) <- c("RP", "MP")
+
 ```
 
 
@@ -26,57 +34,159 @@ library(DT)
 ## Read Data
 
 ```{r}
+<<<<<<< HEAD
 sce <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_original_RPs_MPs.rds")
+=======
+sce <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs.rds"))
+>>>>>>> origin/visualizations
 
 sce_b <- subset_sce(sce, "activation", "baseline")
 sce_a <- subset_sce(sce, "activation", "stimulated")
 
+<<<<<<< HEAD
 de_res_b <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/de_results_baseline_original.rds")
 de_res_a <- readRDS("/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/de_results_stimulated_original.rds")
+=======
+de_res_b <- readRDS(file.path(path_to_data, "de_results_baseline_original.rds"))
+de_res_a <- readRDS(file.path(path_to_data, "de_results_stimulated_original.rds"))
+>>>>>>> origin/visualizations
 ```
 
 ## Marker Distributions
 
-### State Markers
+```{r, include = FALSE }
+plot_marker_distributions <- function(sce, features, activation){
+  # boxplots
+boxplot <- plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen") + 
+  scale_color_manual(name = "", values = RPs_MPs_colors)  + 
+  labs(x = "", y = "Median Expression") +
+  ggtitle(paste0("Median Marker Expression of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples"))
+
+# violinplots
+violin <- plotViolinMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen") + 
+  scale_color_manual(name = "", values = RPs_MPs_colors)  + 
+  scale_fill_manual(name = "", values = RPs_MPs_colors) + 
+  labs(x = "", y = "Median Expression") +
+  ggtitle(paste0("Median Marker Expression of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples")) +
+  guides(fill = "none") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) 
+
+# densities
+densities <- CATALYST::plotExprs(sce,
+                    color_by = "subgroup2",
+                    features = features,
+                    assay = "exprs") +
+  scale_color_manual(name = "", values = RPs_MPs_colors) +
+  labs(x = "Expression", y = "Normalized Density") +
+  ggtitle(paste0("Densities of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples"))
+
+# median marker expressions (Lisanne Median Table)
+return(list(boxplot, violin, densities))
+}
+```
+
+### Baseline level
+
+#### State Markers
 
 ```{r}
 features <- "state"
-
-plotPbExprsMod(sce,
-               k = "all",
-               features = features,
-               assay = "exprs",
-               fun = "median",
-               color_by = "subgroup2",
-               facet_by = "antigen",
-               shape_by = "activation")
-
-
-CATALYST::plotExprs(sce,
-                    color_by = "subgroup2",
-                    features = features,
-                    assay = "exprs")
+activation <- "baseline"
+plot_marker_distributions(sce_b, features, activation)
 ```
 
-### Type Markers
+#### Type Markers
 
 ```{r}
 features <- "type"
-
-plotPbExprsMod(sce,
-               k = "all",
-               features = features,
-               assay = "exprs",
-               fun = "median",
-               color_by = "subgroup2",
-               facet_by = "antigen",
-               shape_by = "activation")
+activation <- "baseline"
+plot_marker_distributions(sce_b, features, activation)
+```
 
 
-CATALYST::plotExprs(sce,
-                    color_by = "subgroup2",
-                    features = features,
-                    assay = "exprs")
+### TRAP stimulated level
+
+#### State Markers
+
+```{r}
+features <- "state"
+activation <- "stimulated"
+plot_marker_distributions(sce_a, features, activation)
+```
+
+#### Type Markers
+
+```{r}
+features <- "type"
+activation <- "stimulated"
+plot_marker_distributions(sce_a, features, activation)
+```
+
+## Dimensionality Reduction
+
+```{r, include = FALSE}
+perform_and_plot_DR <- function(sce){
+  sce <- runDR(sce,
+               dr = "UMAP",
+               cells = 1000,
+               features = "type",
+               assay = "exprs")
+
+sce <- runDR(sce,
+               dr = "TSNE",
+               cells = 1000,
+               features = "type",
+               assay = "exprs")
+
+UMAP_markers <- plotDR(sce, 
+       dr = "UMAP",
+       color_by = c("CD62P", "CD62P", "PAC1", "PAR1", "GPVI"),
+       facet_by = "subgroup2",
+       ncol = 2)
+
+TSNE_markers <- plotDR(sce, 
+       dr = "TSNE",
+       color_by = c("CD62P", "CD62P", "PAC1", "PAR1", "GPVI"),
+       facet_by = "subgroup2",
+       ncol = 2)
+
+TSNE_RPs_MPs <- plotDR(sce,
+       dr = "TSNE",
+       color_by = "subgroup2") +
+    scale_color_manual(name = "", values = RPs_MPs_colors)
+
+
+UMAP_RPs_MPs <- plotDR(sce,
+       dr = "UMAP",
+       color_by = "subgroup2") +
+    scale_color_manual(name = "", values = RPs_MPs_colors) 
+return(list(UMAP_markers, TSNE_markers, TSNE_RPs_MPs, UMAP_RPs_MPs))
+}
+```
+
+
+## Baseline 
+
+```{r}
+perform_and_plot_DR(sce_b)
+```
+
+## TRAP Stimulated
+
+```{r}
+perform_and_plot_DR(sce_b)
 ```
 
 ## DE Results
@@ -195,57 +305,109 @@ createVennHeatmap(de_res_a)
 ## Read Data
 
 ```{r}
-sce <- readRDS("data/sce_CD42b_RPs_MPs.rds")
+sce <- readRDS(file.path(path_to_data, "sce_CD42b_RPs_MPs.rds"))
 
 sce_b <- subset_sce(sce, "activation", "baseline")
 sce_a <- subset_sce(sce, "activation", "stimulated")
 
-de_res_b <- readRDS("data/de_results_baseline_CD42b.rds")
-de_res_a <- readRDS("data/de_results_stimulated_CD42b.rds")
+de_res_b <- readRDS(file.path(path_to_data, "de_results_baseline_CD42b.rds"))
+de_res_a <- readRDS(file.path(path_to_data, "de_results_stimulated_CD42b.rds"))
 ```
 
 ## Marker Distributions
 
-### State Markers
+```{r, include = FALSE }
+plot_marker_distributions <- function(sce, features, activation){
+  # boxplots
+boxplot <- plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen") + 
+  scale_color_manual(name = "", values = RPs_MPs_colors)  + 
+  labs(x = "", y = "Median Expression") +
+  ggtitle(paste0("Median Marker Expression of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples"))
+
+# violinplots
+violin <- plotViolinMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "subgroup2",
+               facet_by = "antigen") + 
+  scale_color_manual(name = "", values = RPs_MPs_colors)  + 
+  scale_fill_manual(name = "", values = RPs_MPs_colors) + 
+  labs(x = "", y = "Median Expression") +
+  ggtitle(paste0("Median Marker Expression of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples")) +
+  guides(fill = "none") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) 
+
+# densities
+densities <- CATALYST::plotExprs(sce,
+                    color_by = "subgroup2",
+                    features = features,
+                    assay = "exprs") +
+  scale_color_manual(name = "", values = RPs_MPs_colors) +
+  labs(x = "Expression", y = "Normalized Density") +
+  ggtitle(paste0("Densities of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples"))
+
+# median marker expressions (Lisanne Median Table)
+return(list(boxplot, violin, densities))
+}
+```
+
+### Baseline level
+
+#### State Markers
 
 ```{r}
 features <- "state"
-
-plotPbExprsMod(sce,
-               k = "all",
-               features = features,
-               assay = "exprs",
-               fun = "median",
-               color_by = "subgroup2",
-               facet_by = "antigen",
-               shape_by = "activation")
-
-
-CATALYST::plotExprs(sce,
-                    color_by = "subgroup2",
-                    features = features,
-                    assay = "exprs")
+activation <- "baseline"
+plot_marker_distributions(sce_b, features, activation)
 ```
 
-### Type Markers
+#### Type Markers
 
 ```{r}
 features <- "type"
-
-plotPbExprsMod(sce,
-               k = "all",
-               features = features,
-               assay = "exprs",
-               fun = "median",
-               color_by = "subgroup2",
-               facet_by = "antigen",
-               shape_by = "activation")
+activation <- "baseline"
+plot_marker_distributions(sce_b, features, activation)
+```
 
 
-CATALYST::plotExprs(sce,
-                    color_by = "subgroup2",
-                    features = features,
-                    assay = "exprs")
+### TRAP stimulated level
+
+#### State Markers
+
+```{r}
+features <- "state"
+activation <- "stimulated"
+plot_marker_distributions(sce_a, features, activation)
+```
+
+#### Type Markers
+
+```{r}
+features <- "type"
+activation <- "stimulated"
+plot_marker_distributions(sce_a, features, activation)
+```
+
+## Dimensionality Reduction
+
+## Baseline 
+
+```{r}
+perform_and_plot_DR(sce_b)
+```
+
+## TRAP Stimulated
+
+```{r}
+perform_and_plot_DR(sce_a)
 ```
 
 ## DE Results
@@ -255,6 +417,8 @@ CATALYST::plotExprs(sce,
 #### Baseline RPs vs. MPs
 
 ```{r}
+# sce subset 
+# nach subgroup kopieren?
 plotDiffHeatmapCustom(x = sce_b,
                       y = de_res_b$t_test,
                       col_anno = c("subgroup", "patient_id"),
@@ -355,5 +519,3 @@ createVennHeatmap(de_res_b)
 ```{r, fig.height = 6}
 createVennHeatmap(de_res_a)
 ```
-
-
