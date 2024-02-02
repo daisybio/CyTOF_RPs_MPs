@@ -5,7 +5,9 @@ output:
     df_print: paged
 ---
 
-Here, we investigate the correlations between the expression of the DNA markers and the other markers. 
+# Investigation of DNA normalization
+
+Here, we investigate how normalizing on DNA2 influences the results.
 
 ## Source functions and libraries
 
@@ -24,7 +26,7 @@ suppressMessages({
   source("functions/prep_functions.R")
 })
 
-paired_boxes <- function(sce) {
+paired_boxes <- function(sce, title) {
   df <- as.data.table(t(assays(sce)$exprs))
   df[, group := colData(sce)$type]
   df[, patient_id := colData(sce)$patient_id]
@@ -35,14 +37,23 @@ paired_boxes <- function(sce) {
   colnames(df_medians) <- c('patient_id', 'group', 'marker', 'expression')
   df_medians[, patient_id := as.factor(patient_id)]
   
+  t_test <- df_medians[, t.test(expression ~ group, paired = T)$p.value, by = marker]
+  colnames(t_test) <- c("Marker", "p.value")
+  t_test[, p.adj := p.adjust(p.value, method = "bonferroni")]
+  t_test[, signif := ifelse(p.adj < 0.001, '***', ifelse(p.adj < 0.05, '**', ifelse(p.adj < 0.1, '*', '')))]
+  t_test[is.na(t_test)] <- ''
+  fwrite(t_test, paste0("plots/", title, "_t_test.csv"))
+  
+  df_medians <- merge(df_medians, t_test[, c('Marker', 'signif')], by.x = 'marker', by.y = 'Marker')
+  df_medians[, marker_title := paste(marker, signif)]
   ggpaired(df_medians, x = "group", y = "expression",
            color = "group", line.color = "gray", line.size = 0.4, id="patient_id",
            palette = "jco")+
-    #stat_compare_means(paired = TRUE, method = "t.test")+
-    facet_wrap(~marker, scales = 'free')
+    facet_wrap(~marker_title, scales = 'free')+
+    ggtitle(title)
 }
 
-dna_boxes <- function(sce) {
+dna_boxes <- function(sce, title) {
   df <- as.data.table(t(assays(sce)$exprs))
   df[, patient_id := colData(sce)$patient_id]
   
@@ -63,7 +74,8 @@ dna_boxes <- function(sce) {
   dna_df <- melt(dna_df, id.vars = c('patient_id', 'marker'), variable.name = 'DNA_marker', value.name = 'correlation')
   
   ggplot(dna_df, aes(x = marker, y = correlation, fill = DNA_marker))+
-    geom_boxplot()
+    geom_boxplot()+
+    ggtitle(title)
 }
 ```
 
@@ -74,43 +86,76 @@ path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
 ```
 
 
-## Visualization
+## Correlation plots
 
 Here, we investigate the correlations between expressions of the 2 DNA markers and the other markers for: 
 
-- the unnormalized data
-- the data normalized w.r.t. CD42b
-- the data normalized w.r.t. CD61
-- the data normalized w.r.t. CD41
-- the data normalized w.r.t. DNA2
+- the unnormalized data: lot's of markers correlate strongly with the amount of DNA-1/DNA-2. Top correlations: CD42a, PAC1, CD29, CD9
+- the data normalized w.r.t. CD42b: overall, the correlation coefficients decrease. Now, the top correlations are platelet-specific markers
+- the data normalized w.r.t. DNA2: correlation coefficients are on the same scale as before, the top markers are the same as for the unnormalized data. This makes sense as we have normalized the data using the marker we are correlating against, so the markers with the highest correlations to DNA2 should now still have the highest correlations.
+
+We can see that regardless of the normalization method, CD62P and CD63 do not correlate strongly with DNA-1/DNA-2 expression.
 
 ```{r, fig.width = 17, fig.height = 5}
-mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
-names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41', 'DNA2')
+mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
+names(mapping) <- c('Original', 'CD42b', 'DNA2')
 
 for(obj in names(mapping)){
   sce <- readRDS(file.path(path_to_data, mapping[obj]))
-  plot(dna_boxes(sce))
+  plot(dna_boxes(sce, obj))
   ggsave(paste0('plots/dna_boxes_', obj, '.png'), height=5, width=17)
 }
 ```
+
+## Paired box plots
 
 Here, we show the pairwise median expressions for RPs vs. MPs for:
 
 - the unnormalized data
 - the data normalized w.r.t. CD42b
-- the data normalized w.r.t. CD61
-- the data normalized w.r.t. CD41
 - the data normalized w.r.t. DNA2
 
 ```{r, fig.width = 12, fig.height = 8}
-mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
-names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41', 'DNA2')
+mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
+names(mapping) <- c('Original', 'CD42b', 'DNA2')
 
 for(obj in names(mapping)){
   sce <- readRDS(file.path(path_to_data, mapping[obj]))
-  plot(paired_boxes(sce))
+  plot(paired_boxes(sce, obj))
+  
   ggsave(paste0('plots/paired_boxes_', obj, '.png'), height=8, width=12)
 }
 ```
+
+### Paired t-test results
+
+#### Original data
+
+Every marker is significantly differently expressed except for CD154, CD3, and CD107a (due to zero-inflation). Looking at the boxplots, we can see that expression is just generally higher for RPs, most likely due to their size. We cannot distinguish between expressions that are due to their size and expressions that are different when corrected for size.
+```{r}
+fread("plots/Original_t_test.csv")[order(p.adj)]
+```
+
+#### Normalization on CD42b
+
+Still, almost every marker is differentially expressed, except for CD154, CD3, CD107a (due to zero-inflation), GPVI (no differences), CD42b (we normalized on this one). For some markers, however, the direction changes from upregulated to downregulated (CD29, CD42a, CD9, PAC1). However, we can still see that DNA-1 and DNA-2 are significantly higher expressed in RPs. We want to control for that.
+
+```{r}
+fread("plots/CD42b_t_test.csv")[order(p.adj)]
+```
+
+#### Normalization on DNA-2
+
+Now we lose more significant markers and more directions change. We think that here, we can really see what is differently expressed in RPs vs. MPs when we correct for the size: 
+
+- Significantly upregulated: CD40, CD45, CD62P, CD63, PAR1, PEAR
+- Significantly downregulated: CD29, CD36, CD42a, CD42b, CD9, GPVI, PAC1
+
+We especially do not lose the signal from CD62P and CD63, which never really correlated with DNA-1/DNA-2 expression. 
+
+```{r}
+fread("plots/DNA2_t_test.csv")[order(p.adj)]
+```
+
+
 

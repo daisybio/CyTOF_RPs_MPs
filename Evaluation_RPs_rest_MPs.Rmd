@@ -1,0 +1,147 @@
+---
+title: "Evaluation of RPs , rest, MPs Data Set"
+author: Arend Lis, Bernett Judith, Manz Quirin
+date: "2023-01-08"
+output: 
+  html_document:
+    number_sections: false
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    fig_width: 12
+    fig_height: 10
+
+---
+
+```{r, setup, include = FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+sapply(list.files("functions/", full.names = TRUE), source)
+
+source("functions.R")
+library(DT)
+library(stringr)
+
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data"
+
+RPs_MPs_colors <- c("#FF1F5B", "#FFC107", "#009ADE")
+names(RPs_MPs_colors) <- c("RP", "rest", "MP")
+
+```
+
+
+# Original Data, only baseline: RPs vs. rest vs. MPs
+
+## Read Data
+
+```{r}
+sce <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs_rest.rds"))
+```
+
+## Marker Distributions
+
+```{r, include = FALSE }
+plot_marker_distributions <- function(sce, features, activation){
+  # boxplots
+boxplot <- plotPbExprsMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "type",
+               facet_by = "antigen") + 
+  scale_color_manual(name = "", values = RPs_MPs_colors)  + 
+  labs(x = "", y = "Median Expression") +
+  ggtitle(paste0("Median Marker Expression of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples"))
+
+# violinplots
+violin <- plotViolinMod(sce,
+               k = "all",
+               features = features,
+               assay = "exprs",
+               fun = "median",
+               color_by = "type",
+               facet_by = "antigen") + 
+  scale_color_manual(name = "", values = RPs_MPs_colors)  + 
+  scale_fill_manual(name = "", values = RPs_MPs_colors) + 
+  labs(x = "", y = "Median Expression") +
+  ggtitle(paste0("Median Marker Expression of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples")) +
+  guides(fill = "none") +
+  theme(axis.text.x = element_blank(), axis.ticks.x = element_blank()) 
+
+# densities
+densities <- CATALYST::plotExprs(sce,
+                    color_by = "type",
+                    features = features,
+                    assay = "exprs") +
+  scale_color_manual(name = "", values = RPs_MPs_colors) +
+  labs(x = "Expression", y = "Normalized Density") +
+  ggtitle(paste0("Densities of ", stringr::str_to_title(features) , " Markers of ", stringr::str_to_title(activation) ," Samples"))
+
+# median marker expressions (Lisanne Median Table)
+return(list(boxplot, violin, densities))
+}
+```
+
+#### State Markers
+
+```{r}
+features <- "state"
+activation <- "baseline"
+plot_marker_distributions(sce, features, activation)
+```
+
+#### Type Markers
+
+```{r}
+features <- "type"
+activation <- "baseline"
+plot_marker_distributions(sce, features, activation)
+```
+
+## Dimensionality Reduction
+
+```{r, include = FALSE}
+perform_and_plot_DR <- function(sce){
+  sce <- runDR(sce,
+               dr = "UMAP",
+               cells = 1000,
+               features = "type",
+               assay = "exprs")
+
+sce <- runDR(sce,
+               dr = "TSNE",
+               cells = 1000,
+               features = "type",
+               assay = "exprs")
+
+UMAP_markers <- plotDR(sce, 
+       dr = "UMAP",
+       color_by = c("CD62P", "CD62P", "PAC1", "PAR1", "GPVI"),
+       facet_by = "type",
+       ncol = 2)
+
+TSNE_markers <- plotDR(sce, 
+       dr = "TSNE",
+       color_by = c("CD62P", "CD62P", "PAC1", "PAR1", "GPVI"),
+       facet_by = "type",
+       ncol = 2)
+
+TSNE_RPs_MPs <- plotDR(sce,
+       dr = "TSNE",
+       color_by = "type") +
+    scale_color_manual(name = "", values = RPs_MPs_colors)
+
+
+UMAP_RPs_MPs <- plotDR(sce,
+       dr = "UMAP",
+       color_by = "type") +
+    scale_color_manual(name = "", values = RPs_MPs_colors) 
+return(list(UMAP_markers, TSNE_markers, TSNE_RPs_MPs, UMAP_RPs_MPs))
+}
+```
+
+
+```{r}
+perform_and_plot_DR(sce)
+```
+
