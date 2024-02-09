@@ -24,6 +24,7 @@ suppressMessages({
   library(pheatmap)
   library(patchwork)
   source("functions/prep_functions.R")
+  source("functions/de_functions.R")
 })
 
 paired_boxes <- function(sce, title) {
@@ -32,7 +33,6 @@ paired_boxes <- function(sce, title) {
   df[, patient_id := colData(sce)$patient_id]
   
   df <- melt(df, id.vars = c('group', 'patient_id'), variable.name = 'marker', value.name = 'expression')
-  
   df_medians <- df[!group == 'rest', median(expression), by=c("patient_id", "group", "marker")]
   colnames(df_medians) <- c('patient_id', 'group', 'marker', 'expression')
   df_medians[, patient_id := as.factor(patient_id)]
@@ -42,8 +42,13 @@ paired_boxes <- function(sce, title) {
   t_test[, p.adj := p.adjust(p.value, method = "bonferroni")]
   t_test[, signif := ifelse(p.adj < 0.001, '***', ifelse(p.adj < 0.05, '**', ifelse(p.adj < 0.1, '*', '')))]
   t_test[is.na(t_test)] <- ''
+    
+  eff_size <- effectSize(makeSampleSelection(sce, deselected_samples = ei(sce)[ei(sce)$type == 'rest', 'sample_id']), condition='type', group='patient_id')
+  eff_size[, Marker := tstrsplit(group1, '::', keep=1)]
+  eff_size <- dcast(eff_size, Marker ~ overall_group, value.var = c('effsize', 'magnitude'))
+  t_test <- merge(t_test, eff_size, by = 'Marker')[order(p.adj)]
   fwrite(t_test, paste0("plots/", title, "_t_test.csv"))
-  
+
   df_medians <- merge(df_medians, t_test[, c('Marker', 'signif')], by.x = 'marker', by.y = 'Marker')
   df_medians[, marker_title := paste(marker, signif)]
   ggpaired(df_medians, x = "group", y = "expression",
@@ -94,7 +99,7 @@ Here, we investigate the correlations between expressions of the 2 DNA markers a
 - the data normalized w.r.t. CD42b: overall, the correlation coefficients decrease. Now, the top correlations are platelet-specific markers
 - the data normalized w.r.t. DNA2: correlation coefficients are on the same scale as before, the top markers are the same as for the unnormalized data. This makes sense as we have normalized the data using the marker we are correlating against, so the markers with the highest correlations to DNA2 should now still have the highest correlations.
 
-We can see that regardless of the normalization method, CD62P and CD63 do not correlate strongly with DNA-1/DNA-2 expression.
+We can see that regardless of the normalization method, CD62P and CD63 do not correlate strongly with DNA-1/DNA-2 expression. This indicates that the RP/MP definition does not correlate with high CD62P/CD63 expression. 
 
 ```{r, fig.width = 17, fig.height = 5}
 mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
@@ -132,6 +137,7 @@ for(obj in names(mapping)){
 #### Original data
 
 Every marker is significantly differently expressed except for CD154, CD3, and CD107a (due to zero-inflation). Looking at the boxplots, we can see that expression is just generally higher for RPs, most likely due to their size. We cannot distinguish between expressions that are due to their size and expressions that are different when corrected for size.
+
 ```{r}
 fread("plots/Original_t_test.csv")[order(p.adj)]
 ```
@@ -151,7 +157,7 @@ Now we lose more significant markers and more directions change. We think that h
 - Significantly upregulated: CD40, CD45, CD62P, CD63, PAR1, PEAR
 - Significantly downregulated: CD29, CD36, CD42a, CD42b, CD9, GPVI, PAC1
 
-We especially do not lose the signal from CD62P and CD63, which never really correlated with DNA-1/DNA-2 expression. 
+CD62P and CD63 are still significantly different between the two groups, which makes sense since they never really correlated with DNA-1/DNA-2 expression. Hence, their expression patterns were never affected by the normalization. Watch out: effect sizes for DNA1 and DNA2 are just moderate/small because, for the effect size, we calculate mean(MP-RP)/sd(MP-RP) and the standard deviation would be zero but becomes a very very small number due to floating point errors. Hence, the denominator is really small, making the effect size large.
 
 ```{r}
 fread("plots/DNA2_t_test.csv")[order(p.adj)]
