@@ -6,7 +6,7 @@
 # first argument -> path of the sce object
 # second argument -> if it is the "original" sce object or the "CD42b" object
 
-#source("renv/activate.R")
+source("renv/activate.R")
 
 ######## ----------------- Source Functions ----------------- ########
 
