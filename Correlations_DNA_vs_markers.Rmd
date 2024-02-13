@@ -34,10 +34,10 @@ paired_boxes <- function(sce, title) {
   
   df <- melt(df, id.vars = c('group', 'patient_id'), variable.name = 'marker', value.name = 'expression')
   df_medians <- df[!group == 'rest', median(expression), by=c("patient_id", "group", "marker")]
-  colnames(df_medians) <- c('patient_id', 'group', 'marker', 'expression')
+  colnames(df_medians) <- c('patient_id', 'group', 'marker', 'Expression')
   df_medians[, patient_id := as.factor(patient_id)]
   
-  t_test <- df_medians[, t.test(expression ~ group, paired = T)$p.value, by = marker]
+  t_test <- df_medians[, t.test(Expression ~ group, paired = T)$p.value, by = marker]
   colnames(t_test) <- c("Marker", "p.value")
   t_test[, p.adj := p.adjust(p.value, method = "bonferroni")]
   t_test[, signif := ifelse(p.adj < 0.001, '***', ifelse(p.adj < 0.05, '**', ifelse(p.adj < 0.1, '*', '')))]
@@ -51,11 +51,7 @@ paired_boxes <- function(sce, title) {
 
   df_medians <- merge(df_medians, t_test[, c('Marker', 'signif')], by.x = 'marker', by.y = 'Marker')
   df_medians[, marker_title := paste(marker, signif)]
-  ggpaired(df_medians, x = "group", y = "expression",
-           color = "group", line.color = "gray", line.size = 0.4, id="patient_id",
-           palette = "jco")+
-    facet_wrap(~marker_title, scales = 'free')+
-    ggtitle(title)
+  return(df_medians)
 }
 
 dna_boxes <- function(sce, title) {
@@ -117,19 +113,49 @@ for(obj in names(mapping)){
 Here, we show the pairwise median expressions for RPs vs. MPs for:
 
 - the unnormalized data
-- the data normalized w.r.t. CD42b
-- the data normalized w.r.t. DNA2
-
-```{r, fig.width = 12, fig.height = 8}
+```{r}
 mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
 names(mapping) <- c('Original', 'CD42b', 'DNA2')
 
-for(obj in names(mapping)){
-  sce <- readRDS(file.path(path_to_data, mapping[obj]))
-  plot(paired_boxes(sce, obj))
-  
-  ggsave(paste0('plots/paired_boxes_', obj, '.png'), height=8, width=12)
-}
+sce <- readRDS(file.path(path_to_data, mapping['Original']))
+df_medians <- paired_boxes(sce, 'Original')
+ggplot(df_medians[signif != ""], aes(x = group, y = Expression, color = group))+
+    geom_violin()+
+    geom_point()+
+    geom_line(aes(group = patient_id), color = '#C4C4C4')+
+    scale_color_manual(values = c("MP" = "#009ADE", "RP" = "#FF1F5B"))+
+    facet_wrap(~marker_title, scales = 'free', nrow = 3)+
+    theme_minimal()+
+    theme(legend.position = 'none', axis.title.x=element_blank())
+```
+
+- the data normalized w.r.t. CD42b
+```{r}
+sce <- readRDS(file.path(path_to_data, mapping['CD42b']))
+df_medians <- paired_boxes(sce, 'CD42b')
+ggplot(df_medians[signif != ""], aes(x = group, y = Expression, color = group))+
+    geom_violin()+
+    geom_point()+
+    geom_line(aes(group = patient_id), color = '#C4C4C4')+
+    scale_color_manual(values = c("MP" = "#009ADE", "RP" = "#FF1F5B"))+
+    facet_wrap(~marker_title, scales = 'free', nrow = 3)+
+    theme_minimal()+
+    theme(legend.position = 'none', axis.title.x=element_blank())
+```
+
+- the data normalized w.r.t. DNA2
+
+```{r, fig.width = 12, fig.height = 8}
+sce <- readRDS(file.path(path_to_data, mapping['DNA2']))
+df_medians <- paired_boxes(sce, 'DNA2')
+ggplot(df_medians[signif != ""], aes(x = group, y = Expression, color = group))+
+    geom_violin()+
+    geom_point()+
+    geom_line(aes(group = patient_id), color = '#C4C4C4')+
+    scale_color_manual(values = c("MP" = "#009ADE", "RP" = "#FF1F5B"))+
+    facet_wrap(~marker_title, scales = 'free', nrow = 3)+
+    theme_minimal()+
+    theme(legend.position = 'none', axis.title.x=element_blank())
 ```
 
 ### Paired t-test results
