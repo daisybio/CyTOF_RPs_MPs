@@ -10,11 +10,65 @@ subset_sce <- function(sce, coldata_column, coldata_value){
   coldata[["sample_id"]] <- droplevels(coldata[, "sample_id"]) 
   SummarizedExperiment::colData(subset_sce) <- S4Vectors::DataFrame(as.data.frame(coldata))
   # subset experimental info
-  sceEI_subset <- sceEI[sceEI$activation == "baseline",]
+  sceEI_subset <- sceEI[sceEI[[coldata_column]] == coldata_value,]
   metadata(subset_sce)$experiment_info <- sceEI_subset
   return(subset_sce)
 }
 
+
+######## ----------------- Functions for Correlation ----------------- ########
+
+paired_boxes <- function(sce, title) {
+  df <- as.data.table(t(assays(sce)$exprs))
+  df[, group := colData(sce)$type]
+  df[, patient_id := colData(sce)$patient_id]
+  
+  df <- melt(df, id.vars = c('group', 'patient_id'), variable.name = 'marker', value.name = 'expression')
+  df_medians <- df[!group == 'rest', median(expression), by=c("patient_id", "group", "marker")]
+  colnames(df_medians) <- c('patient_id', 'group', 'marker', 'Expression')
+  df_medians[, patient_id := as.factor(patient_id)]
+  
+  t_test <- df_medians[, t.test(Expression ~ group, paired = T)$p.value, by = marker]
+  colnames(t_test) <- c("Marker", "p.value")
+  t_test[, p.adj := p.adjust(p.value, method = "bonferroni")]
+  t_test[, signif := ifelse(p.adj < 0.001, '***', ifelse(p.adj < 0.05, '**', ifelse(p.adj < 0.1, '*', '')))]
+  t_test[is.na(t_test)] <- ''
+  
+  eff_size <- effectSize(makeSampleSelection(sce, deselected_samples = ei(sce)[ei(sce)$type == 'rest', 'sample_id']), condition='type', group='patient_id')
+  eff_size[, Marker := tstrsplit(group1, '::', keep=1)]
+  eff_size <- dcast(eff_size, Marker ~ overall_group, value.var = c('effsize', 'magnitude'))
+  t_test <- merge(t_test, eff_size, by = 'Marker')[order(p.adj)]
+  fwrite(t_test, paste0("plots/", title, "_t_test.csv"))
+  
+  df_medians <- merge(df_medians, t_test[, c('Marker', 'signif')], by.x = 'marker', by.y = 'Marker')
+  df_medians[, marker_title := paste(marker, signif)]
+  return(df_medians)
+}
+
+dna_boxes <- function(sce, title) {
+  df <- as.data.table(t(assays(sce)$exprs))
+  df[, patient_id := colData(sce)$patient_id]
+  
+  df_melt <- melt(df, id.vars = c('patient_id', 'DNA1', 'DNA2'), variable.name = 'marker', value.name = 'expression')
+  DNA_1 <- df_melt[, cor(x=DNA1, y=expression), by=c('patient_id', 'marker')]
+  DNA_1[, median_cor := median(V1), by = marker]
+  colnames(DNA_1) <- c('patient_id', 'marker', 'correlation', 'median_cor')
+  
+  DNA_2 <- df_melt[, cor(x=DNA2, y=expression), by=c('patient_id', 'marker')]
+  DNA_2[, median_cor := median(V1), by = marker]
+  DNA_2 <- DNA_2[order(median_cor)]
+  DNA_2[, marker := factor(marker, levels = unique(DNA_2$marker))]
+  DNA_1[, marker := factor(marker, levels = unique(DNA_2$marker))]
+  colnames(DNA_2) <- c('patient_id', 'marker', 'correlation', 'median_cor')
+  
+  dna_df <- merge(DNA_1[, -c('median_cor')], DNA_2[, -c('median_cor')], by = c('patient_id', 'marker'))
+  colnames(dna_df) <- c('patient_id', 'marker', 'DNA_1', 'DNA_2')
+  dna_df <- melt(dna_df, id.vars = c('patient_id', 'marker'), variable.name = 'DNA_marker', value.name = 'correlation')
+  
+  ggplot(dna_df, aes(x = marker, y = correlation, fill = DNA_marker))+
+    geom_boxplot()+
+    ggtitle(title)
+}
 
 ######## ----------------- Functions for CD42b normalization ----------------- ########
 
@@ -47,6 +101,131 @@ normalize_patient_wise_sce <- function(sce, marker = "CD42b", column = "subgroup
   return(sce)
 }
 
+
+######## ----------------- PlotDR Custom ----------------- ########
+plotDR_custom <- function(x, dr = NULL, 
+           color_by = "condition", facet_by = NULL, ncol = NULL,
+           assay = "exprs", scale = TRUE, q = 0.01, dims = c(1, 2),
+           k_pal = CATALYST:::.cluster_cols, 
+           a_pal = hcl.colors(10, "Viridis")) {
+    
+    # check validity of input arguments
+    stopifnot(
+      is(x, "SingleCellExperiment"),
+      CATALYST:::.check_assay(x, assay),
+      length(reducedDims(x)) != 0,
+      is.logical(scale), length(scale) == 1,
+      is.numeric(q), length(q) == 1, q >= 0, q < 0.5)
+    CATALYST:::.check_pal(a_pal)
+    CATALYST:::.check_cd_factor(x, facet_by)
+    
+    if (!is.null(ncol)) 
+      stopifnot(is.numeric(ncol), length(ncol) == 1, ncol %% 1 == 0)
+    
+    if (is.null(dr)) {
+      dr <- reducedDimNames(x)[1]
+    } else {
+      stopifnot(
+        is.character(dr), length(dr) == 1, 
+        dr %in% reducedDimNames(x))
+    }
+    stopifnot(is.numeric(dims), length(dims) == 2, 
+              dims %in% seq_len(ncol(reducedDim(x, dr))))
+    
+    if (!all(color_by %in% rownames(x))) {
+      stopifnot(length(color_by) == 1)
+      if (!color_by %in% names(colData(x))) {
+        CATALYST:::.check_sce(x, TRUE)
+        CATALYST:::.check_pal(k_pal)
+        CATALYST:::.check_k(x, color_by)
+        kids <- cluster_ids(x, color_by)
+        nk <- nlevels(kids)
+        if (length(k_pal) < nk)
+          k_pal <- colorRampPalette(k_pal)(nk)
+      } else kids <- NULL
+    }
+    
+    # construct data.frame of reduced dimensions & relevant cell metadata
+    xy <- reducedDim(x, dr)[, dims]
+    colnames(xy) <- c("x", "y")
+    df <- data.frame(colData(x), xy, check.names = FALSE)
+    if (all(color_by %in% rownames(x))) {
+      es <- as.matrix(assay(x, assay))
+      es <- es[color_by, , drop = FALSE]
+      if (scale) 
+        es <- CATALYST:::.scale_exprs(es, 1, q)
+      df <- melt(
+        cbind(df, t(es)), 
+        id.vars = colnames(df))
+      l <- switch(assay, exprs = "expression", assay)
+      l <- paste0("scaled\n"[scale], l)
+      scale <- scale_colour_gradientn(l, colors = a_pal)
+      thm <- guide <- NULL
+      color_by <- "value"
+      facet <- facet_wrap("variable", ncol = ncol)
+    } else if (is.numeric(df[[color_by]])) {
+      if (scale) {
+        vs <- as.matrix(df[[color_by]])
+        df[[color_by]] <- CATALYST:::.scale_exprs(vs, 2, q)
+      }
+      l <- paste0("scaled\n"[scale], color_by)
+      scale <- scale_colour_gradientn(l, colors = a_pal)
+      color_by <- sprintf("`%s`", color_by)
+      facet <- thm <- guide <- NULL
+    } else {
+      facet <- NULL
+      if (!is.null(kids)) {
+        df[[color_by]] <- kids
+        scale <- scale_color_manual(values = k_pal)
+      } else scale <- NULL
+      n <- nlevels(droplevels(factor(df[[color_by]])))
+      guide <- guides(col = guide_legend(
+        ncol = ifelse(n > 12, 2, 1),
+        override.aes = list(alpha = 1, size = 3))) 
+      thm <- theme(legend.key.height = unit(0.8, "lines"))
+    }
+    
+    # set axes equal for linear dimension reductions
+    if (dr %in% c("PCA", "MDS")) {
+      asp <- coord_equal()
+    } else asp <- NULL
+    
+    # get axes labels
+    if (dr == "PCA") {
+      labs <- paste0("PC", dims)
+    } else labs <- paste(dr, "dim.", dims)
+    
+    # remove cells for which no reduced dimensions are available
+    df <- df[!(is.na(df$x) | is.na(df$y)), ]
+    
+    p <- ggplot(df, aes_string("x", "y", col = color_by)) +
+      geom_point(size = 0.4, alpha = 0.8) + 
+      labs(x = labs[1], y = labs[2]) +
+      facet + scale + guide + asp + 
+      theme_minimal() + thm + theme(
+        panel.grid.minor = element_blank(),
+        strip.text = element_text(face = "bold"),
+        axis.text = element_text(color = "black"),
+        aspect.ratio = if (is.null(asp)) 1 else NULL)
+    
+    if (is.null(facet_by)) 
+      return(p)
+    
+    if (is.null(facet)) {
+      p + facet_wrap(facet_by, ncol = ncol)
+    } else {
+      if (nlevels(df$variable) == 1) {
+        p + facet_wrap(facet_by, ncol = ncol) + 
+          ggtitle(levels(df$variable))
+      } else {
+        fs <- c("variable", facet_by)
+        ns <- vapply(df[fs], nlevels, numeric(1))
+        if (ns[2] > ns[1]) fs <- rev(fs)
+        p + facet_grid(reformulate(fs[2], fs[1]))
+      }
+    }
+}
+  
 
 ######## ----------------- Violin Plots ----------------- ########
 
