@@ -2175,6 +2175,14 @@
         "nlme"
       ]
     },
+    "mclust": {
+      "Package": "mclust",
+      "Version": "6.0.1",
+      "Source": "Repository",
+      "Repository": "CRAN",
+      "Hash": "6381ce71e9498075fbeb229fd3180f62",
+      "Requirements": []
+    },
     "memoise": {
       "Package": "memoise",
       "Version": "2.0.1",

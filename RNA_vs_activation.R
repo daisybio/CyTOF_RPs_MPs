@@ -65,13 +65,28 @@ dna_boxes <- function(sce) {
 
 ######## ----------------- Visualization ----------------- ########
 
-mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds")
-names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41')
+mapping <- c("sce_original_RPs_MPs_rest_DNA.rds", "sce_CD42b_RPs_MPs_rest_DNA.rds", "sce_CD61_RPs_MPs_rest_DNA.rds", "sce_CD41_RPs_MPs_rest_DNA.rds", "sce_DNA2_RPs_MPs_rest_DNA.rds")
+names(mapping) <- c('original', 'CD42b', 'CD61', 'CD41', 'DNA2')
 
-for(obj in names(mapping)[4]){
+for(obj in names(mapping)){
   sce <- readRDS(file.path(path_to_data, mapping[obj]))
   paired_boxes(sce)
   ggsave(paste0('plots/paired_boxes_', obj, '.png'), height=8, width=12)
   dna_boxes(sce)
   ggsave(paste0('plots/dna_boxes_', obj, '.png'), height=5, width=17)
 }
+
+df <- as.data.table(t(assays(sce)$exprs))
+df[, group := colData(sce)$type]
+df[, patient_id := colData(sce)$patient_id]
+
+df <- melt(df, id.vars = c('group', 'patient_id'), variable.name = 'marker', value.name = 'expression')
+
+df_medians <- df[!group == 'rest', median(expression), by=c("patient_id", "group", "marker")]
+colnames(df_medians) <- c('patient_id', 'group', 'marker', 'expression')
+df_medians[, patient_id := as.factor(patient_id)]
+
+t_tests <- df_medians[, t.test(expression ~ group, paired = T)$p.value, by=marker]
+t_tests[, p.adj := p.adjust(V1, method = 'bonferroni')]
+t_tests[, signif := ifelse(p.adj < 0.05, 1, 0)]
+t_tests[order(p.adj, decreasing = F)]

@@ -1,0 +1,152 @@
+---
+title: "Clustering Evaluation of RPs MPs Data Set"
+author: Arend Lis, Bernett Judith, Manz Quirin
+date: "2024-01-24"
+output: 
+  html_document:
+    number_sections: false
+    toc: true
+    toc_depth: 4
+    toc_float: true
+    fig_width: 12
+    fig_height: 10
+
+---
+
+```{r}
+##################### Clustering markers of RPs/MPs/Rest Data #####################
+
+######## ----------------- Source functions ----------------- ########
+library(data.table)
+library(CATALYST)
+library(ggplot2)
+library(stringr)
+library(RColorBrewer)
+source("functions.R")
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/"
+```
+
+
+```{r, eval=FALSE}
+######## ----------------- Prepare Data ----------------- ########
+
+normalize <- NULL
+
+sce_rds <- "sce_original_RPs_MPs_rest_DNA.rds"
+
+if(file.exists(file.path(path_to_data, sce_rds))){
+  sce <- readRDS(file.path(path_to_data, sce_rds))
+} else {
+  panel <- fread(file.path(path_to_data, "panel_DNA.csv"))
+  #built meta data file
+  files <- list.files(file.path(path_to_data, "CCS_baseline"))
+  md <- data.table(file_name = files)
+  md$sample_id <- sapply(strsplit(md$file_name,"[.]"), "[", 1)
+  md$sample_id <- str_replace(md$sample_id, "_platlet_specific", "")
+  md$sample_id <- str_replace(md$sample_id, "RPS_", "RPs") # inconsistent naming of files
+  md$type <- sapply(strsplit(md$sample_id,"_"), "[", 2)
+  md$patient_id <- sapply(strsplit(md$sample_id,"_"), "[", 1) 
+  
+  sce <- prepData(file.path(path_to_data, "CCS_baseline"), 
+                  panel, 
+                  md, 
+                  transform = TRUE,
+                  cofactor = 5,
+                  md_cols = list(file = "file_name", id = "sample_id", factors = c("type", "patient_id")))
+  
+  saveRDS(sce, file.path(path_to_data, sce_rds))
+}
+```
+
+
+```{r, eval=FALSE}
+######## ----------------- Should we really normalize MPs by RPs?  ----------------- ########
+if(!is.null(normalize)){
+  normalized_sce_rds <- sub('original', normalize, sce_rds, fixed = TRUE)
+  if(file.exists(file.path(path_to_data, normalized_sce_rds))){
+  sce <- readRDS(file.path(path_to_data, normalized_sce_rds))
+  } else {
+    sce <- normalize_patient_wise_sce(sce, marker = normalize, column = "type", ain = "exprs", aout = "exprs")
+  
+    saveRDS(sce, file.path(path_to_data, normalized_sce_rds))
+  }
+}
+```
+
+
+```{r, eval=FALSE}
+######## ----------------- Perform Clustering  ----------------- ########
+
+these_features <- c("type", "state")
+
+clustered_sce_rds <- sub('.rds', paste0('_clusteredBy_', paste(these_features, collapse="-"), '.rds'), ifelse(is.null(normalize), sce_rds, normalized_sce_rds), fixed = TRUE)
+
+if(file.exists(file.path(path_to_data, clustered_sce_rds))){
+    sce <- readRDS(file.path(path_to_data, clustered_sce_rds))
+  } else {
+    sce <- clusterSCENew(sce, features = names(sce)[marker_classes(sce) %in% these_features], seed = 1234, xdim = 20, ydim = 20, maxK = 50)
+
+    saveRDS(sce, file.path(path_to_data, clustered_sce_rds))
+}
+```
+# Load the clustered objects
+```{r}
+sce_original <- readRDS(file.path(path_to_data, "sce_original_RPs_MPs_rest_DNA_clusteredBy_type-state.rds"))
+sce_CD42b_normalized <- readRDS(file.path(path_to_data, "sce_CD42b_RPs_MPs_rest_DNA_clusteredBy_type-state.rds"))
+sce_DNA_normalized <- readRDS(file.path(path_to_data, "sce_DNA2_RPs_MPs_rest_DNA_clusteredBy_type-state.rds"))
+```
+
+# CDF
+Plot the cumulative distribution function of the consensusindex, i.e. the values of how often a subcluster was clustered together with another subcluster. A perfect clustering would have only 0s and 1s, indicating that the existing clusters are stable. 
+We actually see this for k = 2 in the unnormalized data.
+The CDF curve should be as flat in the middle as possible, indicating a low proportion of ambigous clusters
+
+```{r}
+######## ----------------- Investigate Clustering  ----------------- ########
+plot_ecdf(sce_original, interactive = FALSE)
+plot_ecdf(sce_CD42b_normalized, interactive = FALSE)
+plot_ecdf(sce_DNA_normalized, interactive = FALSE)
+```
+
+# Delta Area
+The delta area under the curve plot just shows the differences between area under the curve for k, compared to k - 1. One could pick the last point before plateau onset.
+```{r}
+plot_delta_area(sce_original)
+plot_delta_area(sce_CD42b_normalized)
+plot_delta_area(sce_DNA_normalized)
+```
+
+# PAC
+The delta area plot only compares the area under the CDF curve, and does not actually check, where the changes in the curve are happening (changes should help flatten the curve in the middle of the x axis). To overcome this, we can directly compute the proportion of ambiguous clusters (PAC), which is defined by the number of clusters which have a consensus index between, e.g., 0.1 and 0.9. A low value indicates more stable clusters. One has to keep in mind that a large number of clusters usually creates a lower PAC.
+```{r}
+plot_pac(sce_original, x1 = .1)
+plot_pac(sce_CD42b_normalized, x1 = .1)
+plot_pac(sce_DNA_normalized, x1 = .1)
+```
+# ARI
+After deciding for a number of clusters, one can compute the overlap of the given clustering to another labeling. The adjusted rand index computes the agreement between the two classifications. "This index has zero expected value in the case of random partition, and it is bounded above by 1 in the case of perfect agreement between two partitions." A negative ARI indicates worse concordance than a random partition.
+
+In the case below, we computed the ARI for each metacluster in comparison with the "RP", "MP" and "rest" labels.
+
+```{r, fig.width= 9}
+stopifnot(identical(colData(sce_original)$type, colData(sce_DNA_normalized)$type))
+stopifnot(identical(colData(sce_original)$type, colData(sce_CD42b_normalized)$type))
+
+ari_dt <- rbindlist(lapply(list(original = sce_original, 
+                                CD42b_normalized = sce_CD42b_normalized,
+                                DNA2_normalized = sce_DNA_normalized),
+                 function(sce) {
+                   rbindlist(sapply(names(cluster_codes(sce))[startsWith(names(cluster_codes(sce)), 'meta')], function(code)
+                     list(ARI=mclust::adjustedRandIndex(cluster_ids(sce, k = code), colData(sce)$type)), simplify = FALSE),
+                     idcol = 'k')
+                 }), idcol = 'normalization')
+ari_dt[, k:=factor(k, levels = gtools::mixedsort(unique(k)))]
+ggplot(ari_dt, aes(x = k, y = ARI, color = normalization, group = normalization)) + geom_point() + geom_line() + theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r, fig.width=9, fig.height=7, eval=FALSE}
+plotClusterExprs(sce_original, k='meta2', features = NULL)
+plotClusterExprs(sce_DNA_normalized, k='meta2', features = NULL)
+plotClusterExprs(sce_DNA_normalized, k='meta22', features = NULL)
+```
+

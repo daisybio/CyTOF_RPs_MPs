@@ -488,7 +488,7 @@ plotDiffHeatmapCustom(x = sce_a,
                       all = TRUE,
                       eff_r = de_res_a$effect_size,
                       sort_by = "padj",
-                      assay = "exprs",
+                    assay = "exprs",
                       fun = "median",
                       normalize = TRUE
                       )
