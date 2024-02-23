@@ -18,7 +18,7 @@ subset_sce <- function(sce, coldata_column, coldata_value){
 
 ######## ----------------- Functions for Correlation ----------------- ########
 
-paired_boxes <- function(sce, title) {
+paired_boxes <- function(sce, title, out_path) {
   df <- as.data.table(t(assays(sce)$exprs))
   df[, group := colData(sce)$type]
   df[, patient_id := colData(sce)$patient_id]
@@ -38,10 +38,10 @@ paired_boxes <- function(sce, title) {
   eff_size[, Marker := tstrsplit(group1, '::', keep=1)]
   eff_size <- dcast(eff_size, Marker ~ overall_group, value.var = c('effsize', 'magnitude'))
   t_test <- merge(t_test, eff_size, by = 'Marker')[order(p.adj)]
-  fwrite(t_test, paste0("plots/", title, "_t_test.csv"))
-  
-  df_medians <- merge(df_medians, t_test[, c('Marker', 'signif')], by.x = 'marker', by.y = 'Marker')
+
+  df_medians <- merge(df_medians, t_test, by.x = 'marker', by.y = 'Marker')
   df_medians[, marker_title := paste(marker, signif)]
+  fwrite(df_medians, out_path)
   return(df_medians)
 }
 

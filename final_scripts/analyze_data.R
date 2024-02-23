@@ -17,6 +17,11 @@ suppressMessages({
   source("functions.R")
 })
 
+path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_objects"
+
+analysis_state <- "baseline" # or "stimulated"
+
+
 # For reproducibility
 set.seed(1234)
 
@@ -24,20 +29,16 @@ set.seed(1234)
 colors <- c("#FF1F5B", "#009ADE", "#C4C4C4")
 names(colors) <- c("RP", "MP", "rest")
 
-# Read data
-path_to_data <- "/nfs/data/Bongiovanni-KrdIsar-platelets/Cyanus_RPsMPs/data/sce_objects/"
 
-mapping <- c("sce_original_RPs_MPs_rest.rds", "sce_CD42b_RPs_MPs_rest.rds", "sce_DNA2_RPs_MPs_rest.rds")
+# Read data
+mapping <- c(paste0("sce_", analysis_state, "_original_RPs_MPs_rest.rds"), 
+             paste0("sce_", analysis_state, "_CD42b_RPs_MPs_rest.rds"), 
+             paste0("sce_", analysis_state, "_DNA2_RPs_MPs_rest.rds"))
 names(mapping) <- c('Original', 'CD42b', 'DNA2')
 
 sce <- readRDS(file.path(path_to_data, mapping['Original']))
 sce_CD42b <- readRDS(file.path(path_to_data, mapping['CD42b'])) 
 sce_DNA2 <- readRDS(file.path(path_to_data, mapping['DNA2']))
-
-
-# Subset data -> when having the stimulated files
-#sce <- subset_sce(sce, "activation", "baseline")
-#sce <- subset_sce(sce, "activation", "stimulated")
 
 
 ######## Dimensionality Reduction ########
@@ -56,7 +57,7 @@ tsne_RPs_MPs_rest_plot <- plotDR(sce,
   theme(legend.position = "bottom") +
   guides(color = guide_legend(direction = "horizontal", title = "", override.aes = list(size = 5)))
 
-ggsave("plots/TSNE_baseline_RPs_MPs_rest.png", width = 4, height = 4, dpi = 300)
+ggsave(paste0("plots/TSNE_", analysis_state, "_RPs_MPs_rest.png"), width = 4, height = 4, dpi = 300)
 
 # UMAP colored by type (RPs, MPs, rest)
 sce <- runDR(sce,
@@ -72,7 +73,7 @@ umap_RPs_MPs_rest_plot <- plotDR(sce,
   theme(legend.position = "bottom") +
   guides(color = guide_legend(direction = "horizontal", title = "", override.aes = list(size = 5)))
 
-ggsave("plots/UMAP_baseline_RPs_MPs_rest.png", width = 4, height = 4, dpi = 300)
+ggsave(paste0("plots/UMAP_", analysis_state, "_RPs_MPs_rest.png"), width = 4, height = 4, dpi = 300)
 
 
 # tSNE colored by expression, separated by RP and MP
@@ -100,7 +101,7 @@ tsne_expression_plot_2 <- plotDR(sce_RPs_MPs,
 
 tsne_expression_plots <- ggarrange(tsne_expression_plot_1, tsne_expression_plot_2, ncol = 1, common.legend = TRUE, labels = NULL, legend = "bottom")
 
-ggsave("plots/TSNE_baseline_marker_expressions.png", width = 12, height = 8, dpi = 300)
+ggsave(paste0("plots/TSNE_", analysis_state, "_marker_expression.png"), width = 12, height = 8, dpi = 300)
 
 # UMAP colored by expression, separated by RP and MP
 umap_expression_plot_1 <- plotDR(sce_RPs_MPs,
@@ -121,15 +122,13 @@ umap_expression_plot_2 <- plotDR(sce_RPs_MPs,
 
 umap_expression_plots <- ggarrange(umap_expression_plot_1, umap_expression_plot_2, ncol = 1, common.legend = TRUE, labels = NULL, legend = "bottom")
 
-ggsave("plots/UMAP_baseline_marker_expressions.png", width = 10, height = 8, dpi = 300)
-
+ggsave(paste0("plots/UMAP_", analysis_state, "_marker_expression.png"), width = 12, height = 8, dpi = 300)
 
 
 # Paired (patient-wise) analysis of marker expressions
 
 # On original data
-df_medians_original <- paired_boxes(sce, 'Original')
-write.csv(df_medians_original, "tables/median_table_with_paired_results_original.csv")
+df_medians_original <- paired_boxes(sce, 'Original', paste0("tables/median_table_with_paired_results_", analysis_state, "_original.csv"))
 
 df <- df_medians_original[!df_medians_original$marker %in% c("CD45", "DNA1", "DNA2", "CD47"),]
 violins_original <- ggplot(df[signif != ""], aes(x = group, y = Expression, color = group, fill = group))+
@@ -141,13 +140,12 @@ violins_original <- ggplot(df[signif != ""], aes(x = group, y = Expression, colo
   facet_wrap(~marker_title, scales = 'free', ncol = 8)+
   theme_minimal()+
   theme(legend.position = 'none', axis.title.x=element_blank(), axis.text.x = element_blank(), strip.text.x = element_text(face = "bold"))
-ggsave("plots/paired_boxes_original.png", width = 12, height = 4, dpi = 300)
+ggsave(paste0("plots/paired_boxes_", analysis_state, "_original.png"), width = 12, height = 4, dpi = 300)
 
 
 
 # Normalized by size
-df_medians_CD42b <- paired_boxes(sce_CD42b, 'CD42b')
-write.csv(df_medians_CD42b, "tables/median_table_with_paired_results_CD42b.csv")
+df_medians_CD42b <- paired_boxes(sce_CD42b, 'CD42b', paste0("tables/median_table_with_paired_results_", analysis_state, "_CD42b.csv"))
 
 df <- df_medians_CD42b[!df_medians_CD42b$marker %in% c("CD45", "DNA1", "DNA2"),]
 violins_CD42b <- ggplot(df[signif != ""], aes(x = group, y = Expression, color = group, fill = group))+
@@ -159,12 +157,11 @@ violins_CD42b <- ggplot(df[signif != ""], aes(x = group, y = Expression, color =
   facet_wrap(~marker_title, scales = 'free', ncol = 4)+
   theme_minimal()+
   theme(legend.position = 'none', axis.title.x=element_blank(), axis.text.x = element_blank(), strip.text.x = element_text(face = "bold"))
-ggsave("plots/paired_boxes_CD42b.png", width = 6, height = 5, dpi = 300)
+ggsave(paste0("plots/paired_boxes_", analysis_state, "_CD42b.png"), width = 6, height = 5, dpi = 300)
 
 
 # Normalized by RNA
-df_medians_DNA2 <- paired_boxes(sce_DNA2, 'DNA2')
-write.csv(df_medians_DNA2, "tables/median_table_with_paired_results_DNA2.csv")
+df_medians_DNA2 <- paired_boxes(sce_DNA2, 'DNA2', paste0("tables/median_table_with_paired_results_", analysis_state, "_DNA2.csv"))
 
 df <- df_medians_DNA2[!df_medians_DNA2$marker %in% c("CD45"),]
 violins_DNA2 <- ggplot(df[signif != ""], aes(x = group, y = Expression, color = group, fill = group))+
@@ -176,14 +173,11 @@ violins_DNA2 <- ggplot(df[signif != ""], aes(x = group, y = Expression, color = 
   facet_wrap(~marker_title, scales = 'free', ncol = 4)+
   theme_minimal()+
   theme(legend.position = 'none', axis.title.x=element_blank(), axis.text.x = element_blank(), strip.text.x = element_text(face = "bold"))
-ggsave("plots/paired_boxes_DNA2.png", width = 6, height = 5, dpi = 300)
+ggsave(paste0("plots/paired_boxes_", analysis_state, "_DNA2.png"), width = 6, height = 5, dpi = 300)
 
 
 # Overall Figure
-
-plot_A_B <- ggarrange(tsne_RPs_MPs_rest_plot, tsne_expression_plots, ncol = 2, widths = c(0.5, 1))
-plot_C <- ggarrange(violins_original, legend = NULL)
-plot_D_E <- ggarrange(violins_CD42b, violins_DNA2, legend = NULL, labels = NULL)
-
-ggarrange(NULL, plot_A_B, NULL, plot_C, NULL, plot_D_E, nrow = 6, heights = c(0.05, 0.6, 0.05, 0.5, 0.05, 0.7), labels = NULL)
-ggsave("plots/overall_figure_baseline.png", width = 10, height = 12)
+#plot_A_B <- ggarrange(tsne_RPs_MPs_rest_plot, tsne_expression_plots, ncol = 2, widths = c(0.5, 1))
+#plot_C <- ggarrange(violins_original, legend = NULL)
+#plot_D_E <- ggarrange(violins_CD42b, violins_DNA2, legend = NULL, labels = NULL)
+#ggarrange(NULL, plot_A_B, NULL, plot_C, NULL, plot_D_E, nrow = 6, heights = c(0.05, 0.6, 0.05, 0.5, 0.05, 0.7), labels = NULL)
