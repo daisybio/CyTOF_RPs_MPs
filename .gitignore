@@ -9,3 +9,5 @@
 data
 /renv
 *.html
+plots/
+tables/

@@ -12,8 +12,8 @@ suppressMessages({
   library(ggplotify)
   library(pheatmap)
   library(patchwork)
-  source("functions/prep_functions.R")
-  source("functions/de_functions.R")
+  source("cyanus_functions/prep_functions.R")
+  source("cyanus_functions/de_functions.R")
   source("functions.R")
 })
 
